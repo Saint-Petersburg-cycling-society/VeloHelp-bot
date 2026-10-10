@@ -3,7 +3,8 @@
 mod helper;
 mod request;
 
-pub use helper::{HelpKind, HelperProfile};
+pub use helper::{AvailabilityWindow, HelpKind, HelperProfile};
 pub use request::{
-    AcceptOutcome, GeoPoint, HelpRequest, HelpRequestId, HelpRequestStatus, TelegramUserId,
+    is_candidate, AcceptOutcome, Dispatch, DispatchStatus, GeoPoint, HelpRequest, HelpRequestId,
+    HelpRequestStatus, TelegramUserId,
 };

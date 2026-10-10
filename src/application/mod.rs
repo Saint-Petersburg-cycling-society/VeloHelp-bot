@@ -2,4 +2,6 @@
 
 mod service;
 
-pub use service::{AppError, BikeAidService, RequestRepository};
+pub use service::{
+    AppError, BikeAidService, DispatchRepository, HelperRepository, RequestRepository,
+};

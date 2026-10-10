@@ -15,13 +15,13 @@
 - [ ] operator/legal review
 
 ### Phase 1 — backend/domain
-- [ ] SQLite repositories
-- [ ] helper profile
-- [ ] area resolver
-- [ ] create/cancel/expire
-- [ ] matching
-- [ ] atomic accept
-- [ ] concurrent accept integration test
+- [x] SQLite repositories
+- [x] helper profile
+- [x] area resolver
+- [x] create/cancel/expire
+- [x] matching
+- [x] atomic accept
+- [x] concurrent accept integration test
 
 ### Phase 2 — frontend
 - [ ] `/start`
@@ -65,13 +65,13 @@
 - [ ] operator/legal review
 
 ### Phase 1 — backend/domain
-- [ ] SQLite repositories
-- [ ] helper profile
-- [ ] area resolver
-- [ ] create/cancel/expire
-- [ ] matching
-- [ ] atomic accept
-- [ ] concurrent accept integration test
+- [x] SQLite repositories
+- [x] helper profile
+- [x] area resolver
+- [x] create/cancel/expire
+- [x] matching
+- [x] atomic accept
+- [x] concurrent accept integration test
 
 ### Phase 2 — frontend
 - [ ] `/start`

@@ -50,5 +50,6 @@ src/storage/mod.rs
 src/telegram/client.rs
 src/telegram/mod.rs
 src/ui/mod.rs
+tests/accept_race.rs
 tests/domain_accept_spec.md
 tests/ui_scenarios.md
