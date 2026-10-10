@@ -2,6 +2,9 @@
 
 use std::{str::FromStr, time::Duration};
 
+mod read;
+pub use read::{Area, PendingDelivery};
+
 use async_trait::async_trait;
 use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous},
@@ -11,11 +14,12 @@ use sqlx::{
 use crate::{
     application::{AppError, DispatchRepository, HelperRepository, RequestRepository},
     domain::{
-        AcceptOutcome, HelpRequest, HelpRequestId, HelpRequestStatus, HelperProfile, TelegramUserId,
+        AcceptOutcome, ArrivalEstimate, HelpRequest, HelpRequestId, HelpRequestStatus,
+        HelperProfile, TelegramUserId,
     },
 };
 
-/// Connects to the SQLite database with the MVP contract (WAL, FULL synchronous,
+/// Connects to the `SQLite` database with the MVP contract (WAL, FULL synchronous,
 /// foreign keys, 5s busy timeout, single connection).
 ///
 /// # Errors
@@ -37,7 +41,7 @@ pub async fn connect(database_url: &str) -> Result<SqlitePool, sqlx::Error> {
         .await
 }
 
-/// SQLite-backed repositories. Holds the single-writer pool.
+/// `SQLite`-backed repositories. Holds the single-writer pool.
 #[derive(Clone, Debug)]
 pub struct SqliteRepositories {
     pool: SqlitePool,
@@ -68,6 +72,22 @@ fn unix(dt: chrono::DateTime<chrono::Utc>) -> i64 {
 #[async_trait]
 impl RequestRepository for SqliteRepositories {
     async fn insert(&self, request: &HelpRequest) -> Result<(), AppError> {
+        if request.description.trim().is_empty()
+            || request.description.chars().count() > 4000
+            || request
+                .bike_description
+                .as_ref()
+                .is_some_and(|s| s.chars().count() > 2000)
+            || request.expires_at.timestamp() <= chrono::Utc::now().timestamp()
+            || request
+                .exact_point
+                .is_some_and(|p| crate::domain::GeoPoint::new(p.lat, p.lon).is_none())
+        {
+            return Err(AppError::InvalidInput(
+                "invalid request fields or expiry".to_owned(),
+            ));
+        }
+        let mut tx = self.pool.begin().await?;
         let id = uuid_text(request.id);
         let status = request.status.as_str();
         let kind = request.help_kind.as_str();
@@ -81,7 +101,7 @@ impl RequestRepository for SqliteRepositories {
              (id, requester_id, help_kind, description, bike_description,
               exact_lat, exact_lon, area_id, status, matched_helper_id,
               version, expires_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)",
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(id.clone())
         .bind(request.requester_id.0)
@@ -92,21 +112,36 @@ impl RequestRepository for SqliteRepositories {
         .bind(lon)
         .bind(request.area_id.as_deref())
         .bind(status)
+        .bind(request.matched_helper_id.map(|id| id.0))
         .bind(i64::try_from(request.version).map_err(|e| AppError::Storage(e.to_string()))?)
         .bind(expires_at)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
+        if let Some(window) = request.arrival_window {
+            if request.status != HelpRequestStatus::Matched || window.earliest > window.latest {
+                return Err(AppError::InvalidInput("invalid arrival window".into()));
+            }
+            sqlx::query(
+                "UPDATE help_requests SET arrival_from_at=?, arrival_until_at=? WHERE id=?",
+            )
+            .bind(window.earliest.timestamp())
+            .bind(window.latest.timestamp())
+            .bind(&id)
+            .execute(&mut *tx)
+            .await?;
+        }
         for tag in &request.problem_tags {
             sqlx::query(
                 "INSERT OR IGNORE INTO request_problem_tags (request_id, tag) VALUES (?, ?)",
             )
             .bind(id.clone())
             .bind(tag.as_str())
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await
             .map_err(AppError::from)?;
         }
+        tx.commit().await?;
         Ok(())
     }
 
@@ -114,7 +149,7 @@ impl RequestRepository for SqliteRepositories {
         let now = chrono::Utc::now().timestamp();
         let rows = sqlx::query(
             "UPDATE help_requests SET status='open', published_at=?, version=version+1
-             WHERE id=? AND status='draft'",
+             WHERE id=? AND status='draft' AND expires_at > unixepoch()",
         )
         .bind(now)
         .bind(uuid_text(request_id))
@@ -133,7 +168,23 @@ impl RequestRepository for SqliteRepositories {
         &self,
         request_id: HelpRequestId,
         helper_id: TelegramUserId,
+        request_version: u64,
     ) -> Result<AcceptOutcome, AppError> {
+        self.accept_with_arrival(request_id, helper_id, request_version, None)
+            .await
+    }
+    async fn accept_with_arrival(
+        &self,
+        request_id: HelpRequestId,
+        helper_id: TelegramUserId,
+        request_version: u64,
+        estimate: Option<ArrivalEstimate>,
+    ) -> Result<AcceptOutcome, AppError> {
+        if estimate.is_some_and(|e| ArrivalEstimate::new(e.min_minutes, e.max_minutes).is_none()) {
+            return Err(AppError::InvalidInput(
+                "arrival must be within 1..=240 minutes".into(),
+            ));
+        }
         let now = chrono::Utc::now().timestamp();
         let id = uuid_text(request_id);
         // Short write transaction: conditional request update + dispatch updates.
@@ -141,13 +192,24 @@ impl RequestRepository for SqliteRepositories {
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
         let won = sqlx::query(
             "UPDATE help_requests
-             SET status='matched', matched_helper_id=?, matched_at=?, version=version+1
-             WHERE id=? AND status='open' AND expires_at > ?",
+             SET status='matched', matched_helper_id=?, matched_at=?, arrival_from_at=?, arrival_until_at=?, version=version+1
+             WHERE id=? AND status='open' AND expires_at > unixepoch() AND version=?
+               AND requester_id<>?
+               AND EXISTS (
+                   SELECT 1 FROM dispatches d JOIN helper_profiles h ON h.user_id=d.helper_id
+                   WHERE d.request_id=help_requests.id AND d.helper_id=?
+                     AND d.status='pending' AND d.request_version=help_requests.version
+                     AND h.enabled=1
+               )",
         )
         .bind(helper_id.0)
         .bind(now)
+        .bind(estimate.map(|e| now + i64::from(e.min_minutes) * 60))
+        .bind(estimate.map(|e| now + i64::from(e.max_minutes) * 60))
         .bind(id.clone())
-        .bind(now)
+        .bind(i64::try_from(request_version).map_err(|e| AppError::InvalidInput(e.to_string()))?)
+        .bind(helper_id.0)
+        .bind(helper_id.0)
         .execute(&mut *tx)
         .await
         .map_err(AppError::from)?
@@ -177,8 +239,8 @@ impl RequestRepository for SqliteRepositories {
             return Ok(AcceptOutcome::Won);
         }
         // Loser path: read authoritative status (read-only, after failed write).
-        let row: Option<(String, i64)> =
-            sqlx::query_as("SELECT status, expires_at FROM help_requests WHERE id=?")
+        let row: Option<(String, i64, i64)> =
+            sqlx::query_as("SELECT status, expires_at, version FROM help_requests WHERE id=?")
                 .bind(id)
                 .fetch_optional(&mut *tx)
                 .await
@@ -186,15 +248,19 @@ impl RequestRepository for SqliteRepositories {
         tx.rollback().await.map_err(AppError::from)?;
         match row {
             None => Ok(AcceptOutcome::NotOpen),
-            Some((status, expires_at)) => {
+            Some((status, expires_at, version)) => {
                 if status == HelpRequestStatus::Matched.as_str() {
                     Ok(AcceptOutcome::AlreadyTaken)
                 } else if status == HelpRequestStatus::Expired.as_str()
                     || (status == HelpRequestStatus::Open.as_str() && expires_at <= now)
                 {
                     Ok(AcceptOutcome::Expired)
-                } else {
+                } else if status != HelpRequestStatus::Open.as_str() {
                     Ok(AcceptOutcome::NotOpen)
+                } else if u64::try_from(version).ok() != Some(request_version) {
+                    Ok(AcceptOutcome::Stale)
+                } else {
+                    Ok(AcceptOutcome::Forbidden)
                 }
             }
         }
@@ -205,21 +271,24 @@ impl RequestRepository for SqliteRepositories {
         request_id: HelpRequestId,
         requester_id: TelegramUserId,
     ) -> Result<(), AppError> {
+        let mut tx = self.pool.begin().await?;
+        let id = uuid_text(request_id);
         let rows = sqlx::query(
-            "UPDATE help_requests SET status='cancelled', version=version+1
+            "UPDATE help_requests SET status='cancelled', matched_helper_id=NULL, matched_at=NULL, exact_lat=NULL, exact_lon=NULL, arrival_from_at=NULL, arrival_until_at=NULL, version=version+1
              WHERE id=? AND requester_id=? AND status IN ('draft','open','matched')",
         )
-        .bind(uuid_text(request_id))
+        .bind(&id)
         .bind(requester_id.0)
-        .execute(&self.pool)
-        .await
-        .map_err(AppError::from)?
+        .execute(&mut *tx)
+        .await?
         .rows_affected();
-        if rows == 1 {
-            Ok(())
-        } else {
-            Err(AppError::NotFound)
+        if rows != 1 {
+            return Err(AppError::NotFound);
         }
+        sqlx::query("UPDATE dispatches SET status='superseded' WHERE request_id=? AND status IN ('pending','accepted')")
+            .bind(&id).execute(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(())
     }
 
     async fn expire_due(&self, now_unix: i64) -> Result<u64, AppError> {
@@ -234,7 +303,7 @@ impl RequestRepository for SqliteRepositories {
                 .map(|row: (String,)| row.0)
                 .collect();
         for id in &expired {
-            sqlx::query("UPDATE help_requests SET status='expired', version=version+1 WHERE id=?")
+            sqlx::query("UPDATE help_requests SET status='expired', exact_lat=NULL, exact_lon=NULL, arrival_from_at=NULL, arrival_until_at=NULL, version=version+1 WHERE id=?")
                 .bind(id.clone())
                 .execute(&mut *tx)
                 .await
@@ -259,7 +328,7 @@ impl RequestRepository for SqliteRepositories {
     ) -> Result<(), AppError> {
         let now = chrono::Utc::now().timestamp();
         let rows = sqlx::query(
-            "UPDATE help_requests SET status='resolved', resolved_at=?, version=version+1
+            "UPDATE help_requests SET status='resolved', resolved_at=?, exact_lat=NULL, exact_lon=NULL, arrival_from_at=NULL, arrival_until_at=NULL, version=version+1
              WHERE id=? AND requester_id=? AND status='matched'",
         )
         .bind(now)
@@ -285,7 +354,10 @@ impl RequestRepository for SqliteRepositories {
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
         let rows = sqlx::query(
             "UPDATE help_requests
-             SET status='open', matched_helper_id=NULL, matched_at=NULL, version=version+1
+             SET status=CASE WHEN expires_at > unixepoch() THEN 'open' ELSE 'expired' END,
+                 exact_lat=CASE WHEN expires_at > unixepoch() THEN exact_lat END,
+                 exact_lon=CASE WHEN expires_at > unixepoch() THEN exact_lon END,
+                 matched_helper_id=NULL, matched_at=NULL, arrival_from_at=NULL, arrival_until_at=NULL, version=version+1
              WHERE id=? AND matched_helper_id=? AND status='matched'",
         )
         .bind(uuid_text(request_id))
@@ -323,7 +395,7 @@ impl HelperRepository for SqliteRepositories {
         sqlx::query(
             "INSERT INTO users (telegram_user_id, consent_version, consented_at)
              VALUES (?, ?, ?)
-             ON CONFLICT(telegram_user_id) DO UPDATE SET consent_version=excluded.consent_version",
+             ON CONFLICT(telegram_user_id) DO UPDATE SET consent_version=excluded.consent_version, consented_at=excluded.consented_at",
         )
         .bind(user_id.0)
         .bind(consent_version)
@@ -395,17 +467,29 @@ impl DispatchRepository for SqliteRepositories {
         request_id: HelpRequestId,
         helper_ids: &[TelegramUserId],
     ) -> Result<(), AppError> {
+        let mut tx = self.pool.begin().await?;
         let id = uuid_text(request_id);
         for helper in helper_ids {
             sqlx::query(
-                "INSERT OR IGNORE INTO dispatches (request_id, helper_id, status) VALUES (?, ?, 'pending')",
+                "INSERT INTO dispatches (request_id, helper_id, status, request_version)
+                 SELECT r.id, h.user_id, 'pending', r.version
+                 FROM help_requests r JOIN helper_profiles h ON h.user_id=?
+                 WHERE r.id=? AND r.status='open' AND r.expires_at>unixepoch()
+                   AND h.enabled=1 AND h.user_id<>r.requester_id
+                   AND EXISTS (SELECT 1 FROM helper_areas a WHERE a.user_id=h.user_id AND a.area_id=r.area_id)
+                   AND EXISTS (SELECT 1 FROM helper_help_kinds k WHERE k.user_id=h.user_id AND k.help_kind=r.help_kind)
+                 ON CONFLICT(request_id, helper_id) DO UPDATE
+                 SET status='pending', request_version=excluded.request_version,
+                     view_id=NULL, chat_id=NULL, message_id=NULL, ephemeral_message_id=NULL,
+                     sent_at=NULL, acted_at=NULL
+                 WHERE dispatches.request_version < excluded.request_version",
             )
-            .bind(id.clone())
             .bind(helper.0)
-            .execute(&self.pool)
-            .await
-            .map_err(AppError::from)?;
+            .bind(&id)
+            .execute(&mut *tx)
+            .await?;
         }
+        tx.commit().await?;
         Ok(())
     }
 }

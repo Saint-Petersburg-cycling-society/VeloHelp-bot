@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! Simple per-user rate limiter (token bucket, in-memory).
+//! Simple per-user rate limiter (fixed window, in-memory).
 //!
 //! MVP defaults: 10 publishes/hour, 30 accepts/minute per user. Limits are
 //! enforced before touching storage; rejections are normal domain outcomes,
@@ -59,6 +59,7 @@ impl RateLimiter {
     pub fn allow(&self, user_id: i64, scope: Scope) -> bool {
         let mut buckets = self.lock();
         let now = Instant::now();
+        buckets.retain(|_, bucket| bucket.reset_at > now);
         let bucket = buckets.entry((user_id, scope)).or_insert(Bucket {
             tokens: scope.capacity(),
             reset_at: now + scope.window(),

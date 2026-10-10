@@ -10,10 +10,7 @@ use crate::domain::{GeoPoint, HelpKind};
 /// Steps of the request wizard (SPEC §6).
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum RequestStep {
-    Kind,
-    Tags,
     Description,
-    Bike,
     Location,
     Preview,
 }
@@ -36,11 +33,8 @@ impl RequestDraft {
     /// Advances the wizard, staying on preview.
     pub fn next(&mut self) {
         self.step = Some(match self.step {
-            None => RequestStep::Kind,
-            Some(RequestStep::Kind) => RequestStep::Tags,
-            Some(RequestStep::Tags) => RequestStep::Description,
-            Some(RequestStep::Description) => RequestStep::Bike,
-            Some(RequestStep::Bike) => RequestStep::Location,
+            None => RequestStep::Description,
+            Some(RequestStep::Description) => RequestStep::Location,
             Some(RequestStep::Location | RequestStep::Preview) => RequestStep::Preview,
         });
     }
@@ -48,10 +42,9 @@ impl RequestDraft {
     /// Moves back, staying on the first step.
     pub fn back(&mut self) {
         self.step = Some(match self.step {
-            None | Some(RequestStep::Kind | RequestStep::Tags) => RequestStep::Kind,
-            Some(RequestStep::Description) => RequestStep::Tags,
-            Some(RequestStep::Bike) => RequestStep::Description,
-            Some(RequestStep::Location) => RequestStep::Bike,
+            None | Some(RequestStep::Description | RequestStep::Location) => {
+                RequestStep::Description
+            }
             Some(RequestStep::Preview) => RequestStep::Location,
         });
     }
@@ -60,8 +53,19 @@ impl RequestDraft {
     #[must_use]
     pub fn can_publish(&self) -> bool {
         self.kind.is_some()
-            && !self.description.is_empty()
-            && self.exact_point.is_some()
+            && !self.description.trim().is_empty()
+            && self.description.chars().count() <= 4000
+            && self
+                .bike_description
+                .as_ref()
+                .is_none_or(|text| text.chars().count() <= 2000)
+            && self
+                .area_id
+                .as_ref()
+                .is_some_and(|area| !area.trim().is_empty())
+            && self
+                .exact_point
+                .is_some_and(|p| GeoPoint::new(p.lat, p.lon).is_some())
             && !self.publish_attempted
     }
 
@@ -112,7 +116,7 @@ mod tests {
         draft.next();
         draft.next();
         draft.back();
-        assert_eq!(draft.step, Some(RequestStep::Kind));
+        assert_eq!(draft.step, Some(RequestStep::Description));
         assert_eq!(draft.description, "test");
     }
 
@@ -122,6 +126,7 @@ mod tests {
             kind: Some(HelpKind::Technical),
             description: "x".to_owned(),
             exact_point: GeoPoint::new(59.9, 30.3),
+            area_id: Some("spb-center".to_owned()),
             ..Default::default()
         };
         assert!(draft.can_publish());

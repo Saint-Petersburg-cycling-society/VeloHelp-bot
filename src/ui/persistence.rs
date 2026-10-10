@@ -2,11 +2,14 @@
 
 //! Persisted/recoverable UI runtime.
 //!
-//! Domain truth lives in SQLite; UI/session snapshots are recoverable adapter
+//! Domain truth lives in `SQLite`; UI/session snapshots are recoverable adapter
 //! state. Snapshots are JSON files under `/data` (the only writable mount).
 //! Recovery converges by reprojecting from the authoritative domain state.
 
-use std::path::{Path, PathBuf};
+use std::{
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 use serde::{Deserialize, Serialize};
 use teloxide_ui::{Revision, ViewId};
@@ -59,13 +62,32 @@ impl SnapshotStore {
     pub fn save(&self, snapshot: &ViewSnapshot) -> Result<(), std::io::Error> {
         std::fs::create_dir_all(&self.dir)?;
         let path = self.path(snapshot.view_id());
-        let tmp = path.with_extension("tmp");
-        std::fs::write(
-            &tmp,
-            serde_json::to_vec_pretty(snapshot).unwrap_or_default(),
-        )?;
-        std::fs::rename(&tmp, &path)?;
-        Ok(())
+        let tmp = self.dir.join(format!(
+            ".view-{}-{}.tmp",
+            snapshot.view_id,
+            uuid::Uuid::new_v4()
+        ));
+        let result = (|| {
+            let bytes = serde_json::to_vec_pretty(snapshot)
+                .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))?;
+            let mut options = std::fs::OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt;
+                options.mode(0o600);
+            }
+            let mut file = options.open(&tmp)?;
+            file.write_all(&bytes)?;
+            file.sync_all()?;
+            std::fs::rename(&tmp, &path)?;
+            std::fs::File::open(&self.dir)?.sync_all()?;
+            Ok(())
+        })();
+        if result.is_err() {
+            let _ = std::fs::remove_file(&tmp);
+        }
+        result
     }
 
     /// Loads a snapshot, if present.
@@ -79,7 +101,9 @@ impl SnapshotStore {
         match std::fs::read(&path) {
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
             Err(err) => Err(err),
-            Ok(bytes) => Ok(serde_json::from_slice(&bytes).ok()),
+            Ok(bytes) => Ok(serde_json::from_slice::<ViewSnapshot>(&bytes)
+                .ok()
+                .filter(|snapshot| snapshot.view_id() == view_id)),
         }
     }
 
@@ -122,5 +146,47 @@ mod tests {
         assert_eq!(loaded, snapshot);
         store.remove(view).expect("remove");
         assert!(store.load(view).expect("load").is_none());
+    }
+
+    #[test]
+    fn concurrent_snapshot_saves_are_atomic_and_private() {
+        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("target/test-tmp")
+            .join(format!("snapshots-{}", uuid::Uuid::new_v4()));
+        let store = SnapshotStore::new(&dir);
+        let view = ViewId::fresh();
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(8));
+        let workers: Vec<_> = (0..8)
+            .map(|revision| {
+                let store = store.clone();
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    store.save(&ViewSnapshot {
+                        view_id: view.get(),
+                        revision,
+                        request_draft: None,
+                        helper_draft: None,
+                    })
+                })
+            })
+            .collect();
+        for worker in workers {
+            worker.join().unwrap().unwrap();
+        }
+        assert!(store.load(view).unwrap().is_some());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                std::fs::metadata(store.path(view))
+                    .unwrap()
+                    .permissions()
+                    .mode()
+                    & 0o077,
+                0
+            );
+        }
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

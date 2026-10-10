@@ -7,15 +7,15 @@ use std::time::Duration;
 ///
 /// Mirrors `.env.example` and the deployment contract in
 /// `docs/DEPLOYMENT.md`:
-/// - `DATABASE_URL` — SQLite URL (required);
+/// - `DATABASE_URL` — `SQLite` URL (required);
 /// - `TELOXIDE_TOKEN` — Telegram bot token (required);
 /// - `SOURCE_URL` — public Corresponding Source URL for the AGPL instance
 ///   (required, shown in the Home `Source code` button);
 /// - `CONSENT_VERSION` — consent text version recorded in `users` (required);
 /// - `DEFAULT_REQUEST_TTL_MINUTES` — default `Open` TTL (optional, 60).
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Config {
-    /// SQLite database URL, e.g. `sqlite:///data/bike-aid.sqlite`.
+    /// `SQLite` database URL, e.g. `sqlite:///data/bike-aid.sqlite`.
     pub database_url: String,
     /// Telegram bot token.
     pub teloxide_token: String,
@@ -25,6 +25,18 @@ pub struct Config {
     pub consent_version: String,
     /// Default request TTL.
     pub default_ttl: Duration,
+}
+
+impl std::fmt::Debug for Config {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Config")
+            .field("database_url", &self.database_url)
+            .field("teloxide_token", &"[REDACTED]")
+            .field("source_url", &self.source_url)
+            .field("consent_version", &self.consent_version)
+            .field("default_ttl", &self.default_ttl)
+            .finish()
+    }
 }
 
 impl Config {
@@ -38,9 +50,20 @@ impl Config {
     /// Returns [`anyhow::Error`] when a required variable is missing or
     /// `DEFAULT_REQUEST_TTL_MINUTES` is not a valid TTL.
     pub fn from_env() -> anyhow::Result<Self> {
+        Self::load(true)
+    }
+
+    /// Loads offline preflight configuration without requiring a bot token.
+    ///
+    /// # Errors
+    /// Returns an error for missing or invalid non-secret configuration.
+    pub fn for_preflight() -> anyhow::Result<Self> {
+        Self::load(false)
+    }
+
+    fn load(require_token: bool) -> anyhow::Result<Self> {
         let database_url = std::env::var("DATABASE_URL").context("DATABASE_URL is required")?;
-        let teloxide_token =
-            std::env::var("TELOXIDE_TOKEN").context("TELOXIDE_TOKEN is required")?;
+        let teloxide_token = std::env::var("TELOXIDE_TOKEN").unwrap_or_default();
         let source_url = std::env::var("SOURCE_URL").context("SOURCE_URL is required")?;
         let consent_version =
             std::env::var("CONSENT_VERSION").context("CONSENT_VERSION is required")?;
@@ -53,13 +76,45 @@ impl Config {
                 Self::parse_ttl_minutes(raw.as_str())?
             }
         };
-        Ok(Self {
+        let config = Self {
             database_url,
             teloxide_token,
             source_url,
             consent_version,
             default_ttl,
-        })
+        };
+        config.validate(require_token)?;
+        Ok(config)
+    }
+
+    /// Validates required values without echoing credentials in errors.
+    ///
+    /// # Errors
+    /// Returns an error for blank fields, non-HTTPS source URLs or invalid TTL.
+    pub fn validate(&self, require_token: bool) -> anyhow::Result<()> {
+        for (key, value) in [
+            ("DATABASE_URL", self.database_url.as_str()),
+            ("SOURCE_URL", self.source_url.as_str()),
+            ("CONSENT_VERSION", self.consent_version.as_str()),
+        ] {
+            anyhow::ensure!(!value.trim().is_empty(), "{key} must not be empty");
+        }
+        if require_token {
+            anyhow::ensure!(
+                !self.teloxide_token.trim().is_empty(),
+                "TELOXIDE_TOKEN must not be empty"
+            );
+        }
+        let url = reqwest::Url::parse(&self.source_url).context("invalid SOURCE_URL")?;
+        anyhow::ensure!(
+            url.scheme() == "https" && url.host_str().is_some(),
+            "SOURCE_URL must be an absolute HTTPS URL"
+        );
+        anyhow::ensure!(
+            (300..=86400).contains(&self.default_ttl.as_secs()),
+            "request TTL must be 5..=1440 minutes"
+        );
+        Ok(())
     }
 
     /// Parses `DEFAULT_REQUEST_TTL_MINUTES` (5..=1440).

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! SQLite online backup + restore check.
+//! `SQLite` online backup + restore check.
 //!
 //! Never raw-copies an open WAL database. Uses `VACUUM INTO` (online backup
 //! API equivalent) from the host side; the production container intentionally
@@ -13,19 +13,11 @@ use sqlx::SqlitePool;
 /// # Errors
 ///
 /// Returns [`sqlx::Error`] when the backup fails.
-///
-/// # Panics
-///
-/// Panics when `dest` contains a quote or semicolon (unsafe path).
 pub async fn backup_sqlite(pool: &SqlitePool, dest: &str) -> Result<(), sqlx::Error> {
-    // `VACUUM INTO` cannot take a bound parameter for the path; validate that
-    // the destination is a plain fascinated path without quotes/semicolons.
-    assert!(
-        !dest.contains('\'') && !dest.contains(';'),
-        "unsafe backup destination"
-    );
-    let sql = format!("VACUUM INTO '{dest}'");
-    sqlx::query(&sql).execute(pool).await?;
+    sqlx::query("VACUUM INTO ?")
+        .bind(dest)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
@@ -40,12 +32,4 @@ pub async fn restore_check(pool: &SqlitePool) -> Result<bool, sqlx::Error> {
         .fetch_one(pool)
         .await?;
     Ok(result.eq_ignore_ascii_case("ok"))
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn backup_path_validation() {
-        assert!("ok/path.sqlite".contains('/'));
-    }
 }

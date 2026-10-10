@@ -6,3 +6,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 The application depends on teloxide-ui, a separate MIT-licensed project:
 https://github.com/Mar2ianen/teloxide-ui
+
+District/address data / Данные границ и адресов:
+assets/areas/spb-districts.json, assets/areas/spb-addresses.json — © OpenStreetMap contributors.
+Separately licensed / Отдельная лицензия: ODbL 1.0
+https://opendatacommons.org/licenses/odbl/1-0/
+https://www.openstreetmap.org/copyright
+See / См. assets/areas/README.md for provenance and reproduction.

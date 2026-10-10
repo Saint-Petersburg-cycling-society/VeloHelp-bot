@@ -12,6 +12,9 @@ WORKDIR /src
 COPY Cargo.toml Cargo.lock rust-toolchain.toml build.rs ./
 COPY src ./src
 COPY migrations ./migrations
+COPY assets/icons/generated/mapping.json ./assets/icons/generated/mapping.json
+COPY assets/areas/spb-districts.json ./assets/areas/spb-districts.json
+COPY assets/areas/spb-addresses.json ./assets/areas/spb-addresses.json
 
 # Cargo.lock is committed; release builds MUST be reproducible.
 RUN cargo build --release --locked

@@ -16,17 +16,15 @@ use crate::domain::{HelpRequest, HelpRequestStatus};
 #[derive(Clone, Debug, PartialEq)]
 pub struct ProjectionTarget {
     pub surface: Surface,
-    /// `true` for the requester view, `false` for helper dispatch views.
-    pub is_requester: bool,
-    /// `true` only for the matched helper (exact-point disclosure).
-    pub is_matched_helper: bool,
+    /// Authenticated viewer; disclosure is derived from domain identity, never flags.
+    pub viewer: crate::domain::TelegramUserId,
     pub revision: Revision,
 }
 
 /// Builds post-commit effects for requester + dispatch surfaces.
 ///
-/// Privacy: only the matched helper surface receives the exact point, via
-/// `matched_helper_view`. Dispatch cards never contain it.
+/// Privacy: the transport enriches matched participant cards with a map and
+/// peer name after checking authoritative membership. Dispatches stay coarse.
 #[must_use]
 pub fn reproject_request(
     request: &HelpRequest,
@@ -36,16 +34,14 @@ pub fn reproject_request(
     targets
         .iter()
         .map(|target| {
-            let ui = match request.status {
-                HelpRequestStatus::Matched if target.is_matched_helper => {
-                    views::matched_helper_view(request)
-                }
-                HelpRequestStatus::Matched if target.is_requester => {
-                    views::matched_requester_view(request)
-                }
-                HelpRequestStatus::Matched => views::dispatch_card_view(request, dispatch_area),
-                _ if target.is_requester => views::matched_requester_view(request),
-                _ => views::dispatch_card_view(request, dispatch_area),
+            let ui = if target.viewer == request.requester_id {
+                views::matched_requester_view(request)
+            } else if request.status == HelpRequestStatus::Matched
+                && request.matched_helper_id == Some(target.viewer)
+            {
+                views::matched_helper_view(request, target.viewer)
+            } else {
+                views::dispatch_card_view(request, dispatch_area)
             };
             Effect::RenderAt {
                 surface: target.surface.clone(),
@@ -79,6 +75,7 @@ mod tests {
             bike_description: None,
             status: HelpRequestStatus::Matched,
             matched_helper_id: Some(TelegramUserId(2)),
+            arrival_window: None,
             exact_point: GeoPoint::new(59.9, 30.3),
             area_id: Some("spb-center".to_owned()),
             expires_at: Utc::now() + TimeDelta::minutes(60),
@@ -100,8 +97,7 @@ mod tests {
         let req = matched_request();
         let targets = vec![ProjectionTarget {
             surface: surface(1, 1),
-            is_requester: true,
-            is_matched_helper: false,
+            viewer: TelegramUserId(1),
             revision: Revision::INITIAL,
         }];
         let effects = reproject_request(&req, &targets, "spb-center");
@@ -124,28 +120,27 @@ mod tests {
         let targets = vec![
             ProjectionTarget {
                 surface: surface(1, 1),
-                is_requester: true,
-                is_matched_helper: false,
+                viewer: TelegramUserId(1),
                 revision: Revision::INITIAL,
             },
             ProjectionTarget {
                 surface: surface(2, 2),
-                is_requester: false,
-                is_matched_helper: true,
+                viewer: TelegramUserId(2),
                 revision: Revision::INITIAL,
             },
             ProjectionTarget {
                 surface: surface(3, 3),
-                is_requester: false,
-                is_matched_helper: false,
+                viewer: TelegramUserId(3),
                 revision: Revision::INITIAL,
             },
         ];
         let effects = reproject_request(&req, &targets, "spb-center");
         assert_eq!(effects.len(), 3);
-        // Loser helper surface must not contain the exact point.
-        let rendered = format!("{effects:?}");
-        assert!(rendered.contains("59.9"), "winner gets exact point");
+        assert!(format!("{:?}", effects[1]).contains("Withdraw"));
+        for index in [0, 2] {
+            assert!(!format!("{:?}", effects[index]).contains("Withdraw"));
+        }
+        assert!(!format!("{effects:?}").contains("59.9"));
     }
 
     #[test]

@@ -2,6 +2,13 @@
 .env
 .env.*
 !.env.example
+# Runtime credentials and private account filters must stay outside version control.
+*.env
+/secrets/
+/work/
+/outputs/
+emoji-registration*.json
+register-emoji*.py
 *.swp
 *.swo
 .DS_Store

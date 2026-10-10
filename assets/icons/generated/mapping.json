@@ -1,0 +1,186 @@
+{
+  "nav.home": {
+    "custom_emoji_id": "5355228398773907202",
+    "emoji": "🏠"
+  },
+  "nav.back": {
+    "custom_emoji_id": "5357451310637559478",
+    "emoji": "⬅️"
+  },
+  "nav.next": {
+    "custom_emoji_id": "5355272362059146484",
+    "emoji": "➡️"
+  },
+  "nav.settings": {
+    "custom_emoji_id": "5354790711541672391",
+    "emoji": "⚙️"
+  },
+  "action.accept": {
+    "custom_emoji_id": "5357324806670820987",
+    "emoji": "✅"
+  },
+  "action.decline": {
+    "custom_emoji_id": "5354954160817092686",
+    "emoji": "➖"
+  },
+  "action.cancel": {
+    "custom_emoji_id": "5357210904138131712",
+    "emoji": "❌"
+  },
+  "action.resolve": {
+    "custom_emoji_id": "5357237713323991389",
+    "emoji": "☑️"
+  },
+  "action.edit": {
+    "custom_emoji_id": "5355217433722396258",
+    "emoji": "✏️"
+  },
+  "action.source": {
+    "custom_emoji_id": "5355002943055637327",
+    "emoji": "💻"
+  },
+  "request.help": {
+    "custom_emoji_id": "5355213490942422497",
+    "emoji": "🆘"
+  },
+  "helper.profile": {
+    "custom_emoji_id": "5357279383096700749",
+    "emoji": "🤝"
+  },
+  "location.point": {
+    "custom_emoji_id": "5354781455887148855",
+    "emoji": "📍"
+  },
+  "location.area": {
+    "custom_emoji_id": "5355147979806255737",
+    "emoji": "🗺️"
+  },
+  "problem.puncture": {
+    "custom_emoji_id": "5355183035329325380",
+    "emoji": "🛞"
+  },
+  "problem.drivetrain": {
+    "custom_emoji_id": "5355080205222324067",
+    "emoji": "🔗"
+  },
+  "problem.brakes": {
+    "custom_emoji_id": "5357291735422641790",
+    "emoji": "🛑"
+  },
+  "problem.wheel": {
+    "custom_emoji_id": "5354798820439929119",
+    "emoji": "🛞"
+  },
+  "problem.tools": {
+    "custom_emoji_id": "5354971426585618326",
+    "emoji": "🔧"
+  },
+  "problem.transport": {
+    "custom_emoji_id": "5355273783693323469",
+    "emoji": "🚐"
+  },
+  "problem.accident": {
+    "custom_emoji_id": "5355278198919702772",
+    "emoji": "⚠️"
+  },
+  "problem.other": {
+    "custom_emoji_id": "5355078757818346247",
+    "emoji": "❔"
+  },
+  "status.open": {
+    "custom_emoji_id": "5354825380517683309",
+    "emoji": "📄"
+  },
+  "status.matched": {
+    "custom_emoji_id": "5355109110352226997",
+    "emoji": "🤝"
+  },
+  "status.resolved": {
+    "custom_emoji_id": "5357397357258386502",
+    "emoji": "✅"
+  },
+  "status.expired": {
+    "custom_emoji_id": "5354932020260676299",
+    "emoji": "⌛"
+  },
+  "privacy.data": {
+    "custom_emoji_id": "5355274183125280516",
+    "emoji": "🔒"
+  },
+  "privacy.delete": {
+    "custom_emoji_id": "5355176837691517843",
+    "emoji": "🗑️"
+  },
+  "area.admiralteysky": {
+    "custom_emoji_id": "5354784750127066217",
+    "emoji": "🏛️"
+  },
+  "area.vasileostrovsky": {
+    "custom_emoji_id": "5355293781061053866",
+    "emoji": "🏛️"
+  },
+  "area.vyborgsky": {
+    "custom_emoji_id": "5357479739026090107",
+    "emoji": "🏛️"
+  },
+  "area.kalininsky": {
+    "custom_emoji_id": "5354962467283841142",
+    "emoji": "🚂"
+  },
+  "area.kirovsky": {
+    "custom_emoji_id": "5355274337744103922",
+    "emoji": "🏛️"
+  },
+  "area.kolpinsky": {
+    "custom_emoji_id": "5354947542272486973",
+    "emoji": "🏭"
+  },
+  "area.krasnogvardeysky": {
+    "custom_emoji_id": "5355324610336301860",
+    "emoji": "🌉"
+  },
+  "area.krasnoselsky": {
+    "custom_emoji_id": "5355127402617941265",
+    "emoji": "⛰️"
+  },
+  "area.kronshtadtsky": {
+    "custom_emoji_id": "5357052063362623930",
+    "emoji": "🏛️"
+  },
+  "area.kurortny": {
+    "custom_emoji_id": "5354782606938392337",
+    "emoji": "🏖️"
+  },
+  "area.moskovsky": {
+    "custom_emoji_id": "5357055726969728326",
+    "emoji": "🏛️"
+  },
+  "area.nevsky": {
+    "custom_emoji_id": "5354803218486435330",
+    "emoji": "🌉"
+  },
+  "area.petrogradsky": {
+    "custom_emoji_id": "5354953044125590532",
+    "emoji": "🏛️"
+  },
+  "area.petrodvortsovy": {
+    "custom_emoji_id": "5355066933773380322",
+    "emoji": "⛲"
+  },
+  "area.primorsky": {
+    "custom_emoji_id": "5355023820891661873",
+    "emoji": "🏙️"
+  },
+  "area.pushkinsky": {
+    "custom_emoji_id": "5355024744309630650",
+    "emoji": "🏛️"
+  },
+  "area.frunzensky": {
+    "custom_emoji_id": "5355229412386187726",
+    "emoji": "🚇"
+  },
+  "area.tsentralny": {
+    "custom_emoji_id": "5355232650791529358",
+    "emoji": "🏛️"
+  }
+}

@@ -84,6 +84,8 @@ pub struct HelpRequest {
     pub bike_description: Option<String>,
     pub status: HelpRequestStatus,
     pub matched_helper_id: Option<TelegramUserId>,
+    #[serde(default)]
+    pub arrival_window: Option<super::ArrivalWindow>,
     pub exact_point: Option<GeoPoint>,
     pub area_id: Option<String>,
     pub expires_at: DateTime<Utc>,
@@ -109,6 +111,7 @@ impl HelpRequest {
             bike_description: None,
             status: HelpRequestStatus::Draft,
             matched_helper_id: None,
+            arrival_window: None,
             exact_point: None,
             area_id: None,
             expires_at,
@@ -159,6 +162,8 @@ pub enum AcceptOutcome {
     AlreadyTaken,
     NotOpen,
     Expired,
+    Stale,
+    Forbidden,
 }
 
 /// MVP matching predicate (SPEC §7): enabled, not the requester, area

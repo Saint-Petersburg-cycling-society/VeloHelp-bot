@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! Atomic accept race: N helpers vs one open request, real SQLite adapter.
+//! Atomic accept race: N helpers vs one open request, real `SQLite` adapter.
 //! See `tests/domain_accept_spec.md`.
 
 use std::time::Duration;
@@ -9,8 +9,8 @@ use bike_aid::{
     application::{DispatchRepository, HelperRepository, RequestRepository},
     config::Config,
     domain::{
-        AcceptOutcome, HelpKind, HelpRequest, HelpRequestId, HelpRequestStatus, HelperProfile,
-        TelegramUserId,
+        AcceptOutcome, ArrivalEstimate, HelpKind, HelpRequest, HelpRequestId, HelpRequestStatus,
+        HelperProfile, TelegramUserId,
     },
     storage::{connect, SqliteRepositories},
 };
@@ -50,6 +50,7 @@ fn open_request(requester: TelegramUserId, area: &str) -> HelpRequest {
 const RACE_N: i64 = 8;
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn concurrent_accept_has_exactly_one_winner() {
     let repo = test_pool("accept-race").await;
     let now = Utc::now().timestamp();
@@ -79,12 +80,33 @@ async fn concurrent_accept_has_exactly_one_winner() {
     repo.insert(&req).await.unwrap();
     repo.fanout(request_id, &helpers).await.unwrap();
 
+    // One repository pool deliberately has one connection, so model separate
+    // workers/processes with independent SQLite pools and a start barrier.
+    let path = repo.pool().connect_options().get_filename().to_owned();
+    let barrier = std::sync::Arc::new(tokio::sync::Barrier::new(helpers.len()));
     let barriers: Vec<_> = helpers
         .iter()
         .map(|h| {
-            let repo = repo.clone();
             let helper = *h;
-            tokio::spawn(async move { repo.accept(request_id, helper).await })
+            let path = path.clone();
+            let barrier = barrier.clone();
+            tokio::spawn(async move {
+                let other = SqliteRepositories::new(
+                    connect(&format!("sqlite://{}", path.display()))
+                        .await
+                        .expect("independent connection"),
+                );
+                barrier.wait().await;
+                let index = u16::try_from(helper.0 - 9100).unwrap();
+                other
+                    .accept_with_arrival(
+                        request_id,
+                        helper,
+                        0,
+                        ArrivalEstimate::new(5 + index, 15 + index),
+                    )
+                    .await
+            })
         })
         .collect();
     let mut won = 0;
@@ -113,6 +135,15 @@ async fn concurrent_accept_has_exactly_one_winner() {
     assert_eq!(status, "matched");
     let matched = matched.expect("matched_helper_id");
     assert!(helpers.iter().any(|h| h.0 == matched));
+    let (start, end, anchored): (i64, i64, i64) = sqlx::query_as(
+        "SELECT arrival_from_at, arrival_until_at, matched_at FROM help_requests WHERE id=?",
+    )
+    .bind(request_id.0.to_string())
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    assert_eq!(start - anchored, (5 + matched - 9100) * 60);
+    assert_eq!(end - anchored, (15 + matched - 9100) * 60);
 
     let counts: Vec<(String, i64)> = sqlx::query_as(
         "SELECT status, COUNT(*) FROM dispatches WHERE request_id=? GROUP BY status",
@@ -158,26 +189,61 @@ async fn cancel_races_accept_without_panic() {
     repo.insert(&req).await.unwrap();
     repo.fanout(request_id, &[helper]).await.unwrap();
 
+    let path = repo.pool().connect_options().get_filename().to_owned();
+    let other = SqliteRepositories::new(
+        connect(&format!("sqlite://{}", path.display()))
+            .await
+            .unwrap(),
+    );
+    let barrier = std::sync::Arc::new(tokio::sync::Barrier::new(2));
+    let wait = barrier.clone();
     let r1 = repo.clone();
-    let accept = tokio::spawn(async move { r1.accept(request_id, helper).await });
-    let r2 = repo.clone();
-    let cancel = tokio::spawn(async move { r2.cancel(request_id, requester).await });
+    let accept = tokio::spawn(async move {
+        wait.wait().await;
+        r1.accept(request_id, helper, 0).await
+    });
+    let wait = barrier.clone();
+    let cancel = tokio::spawn(async move {
+        wait.wait().await;
+        other.cancel(request_id, requester).await
+    });
     let (accept_outcome, cancel_outcome) = tokio::join!(accept, cancel);
-    // Either order is a valid domain outcome; the point is no panic and a
-    // consistent terminal state.
-    let _ = accept_outcome.expect("accept task").expect("accept");
-    let _ = cancel_outcome.expect("cancel task");
+    let accept_outcome = accept_outcome
+        .expect("accept task")
+        .expect("accept storage");
+    let cancel_outcome = cancel_outcome.expect("cancel task");
 
     let pool = repo.pool();
-    let (status,): (String,) = sqlx::query_as("SELECT status FROM help_requests WHERE id=?")
+    let (status, matched, latitude, longitude): (String, Option<i64>, Option<f64>, Option<f64>) =
+        sqlx::query_as(
+            "SELECT status, matched_helper_id, exact_lat, exact_lon FROM help_requests WHERE id=?",
+        )
         .bind(request_id.0.to_string())
         .fetch_one(pool)
         .await
         .unwrap();
     assert!(
-        ["matched", "cancelled", "expired"].contains(&status.as_str()),
-        "consistent terminal state, got {status}"
+        ["matched", "cancelled"].contains(&status.as_str()),
+        "consistent outcome: {status}"
     );
+    match status.as_str() {
+        "matched" => {
+            assert_eq!(accept_outcome, AcceptOutcome::Won);
+            assert!(cancel_outcome.is_err());
+            assert_eq!(matched, Some(helper.0));
+            assert!(latitude.is_some() && longitude.is_some());
+        }
+        "cancelled" => {
+            assert!(matches!(
+                accept_outcome,
+                AcceptOutcome::Won | AcceptOutcome::NotOpen
+            ));
+            assert!(cancel_outcome.is_ok());
+            assert_eq!(matched, None);
+            assert_eq!((latitude, longitude), (None, None));
+        }
+        _ => unreachable!(),
+    }
 }
 
 #[tokio::test]
@@ -219,6 +285,6 @@ async fn expiry_boundary_marks_open_expired() {
     let expired = repo.expire_due(Utc::now().timestamp()).await.unwrap();
     assert_eq!(expired, 1);
 
-    let outcome = repo.accept(request_id, helper).await.unwrap();
+    let outcome = repo.accept(request_id, helper, 0).await.unwrap();
     assert_eq!(outcome, AcceptOutcome::Expired);
 }

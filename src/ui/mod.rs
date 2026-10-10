@@ -10,6 +10,7 @@ use crate::domain::HelpRequestId;
 pub mod components;
 pub mod dispatcher;
 pub mod effects;
+pub mod icons;
 pub mod persistence;
 pub mod policy;
 pub mod session;
@@ -37,9 +38,29 @@ pub enum Action {
     WizardBack,
     WizardNext,
     PublishRequest,
-    Accept(HelpRequestId),
-    Decline(HelpRequestId),
+    Accept(HelpRequestId, u64),
+    AcceptAt(HelpRequestId, u64, crate::domain::ArrivalEstimate),
+    EnterArrival(HelpRequestId, u64),
+    ArrivalBack(HelpRequestId, u64),
+    AbortAccept(HelpRequestId),
+    Decline(HelpRequestId, u64),
     Cancel(HelpRequestId),
     Resolve(HelpRequestId),
     OpenSource,
+    Home,
+    More,
+    HelperAreas,
+    HelperOptions,
+    Consent(String),
+    SelectProblem(String),
+    EditDescription,
+    ToggleEnabled,
+    SaveHelper,
+    ActiveRequests,
+    OpenRequest(HelpRequestId),
+    Privacy,
+    ExportData,
+    ConfirmDelete,
+    DeleteData,
+    Withdraw(HelpRequestId),
 }

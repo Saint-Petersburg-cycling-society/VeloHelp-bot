@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::TelegramUserId;
 
-/// Kind of help, stored as `technical`/`accident` in SQLite.
+/// Kind of help, stored as `technical`/`accident` in `SQLite`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum HelpKind {

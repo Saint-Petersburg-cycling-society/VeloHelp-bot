@@ -4,7 +4,6 @@ target
 .env
 .env.*
 docs
-assets
 deploy
 tests
 README.md

@@ -17,8 +17,12 @@
 - A/B/C receive same request;
 - B accepts;
 - A clicks old Accept after commit;
-- C declines after B wins;
+- C declines after B wins; this must not reopen or alter the match;
 - requester cancels concurrently with helper Accept;
+- helper withdraws concurrently with requester cancellation; only an open new
+  wave or a fully cancelled request is valid;
+- the same helper accepts and declines concurrently; only a won match or an open
+  request with a declined dispatch is valid;
 - request expires while helper is viewing notification.
 
 ## Projection

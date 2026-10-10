@@ -3,7 +3,9 @@
 use async_trait::async_trait;
 use thiserror::Error;
 
-use crate::domain::{AcceptOutcome, HelpRequest, HelpRequestId, HelperProfile, TelegramUserId};
+use crate::domain::{
+    AcceptOutcome, ArrivalEstimate, HelpRequest, HelpRequestId, HelperProfile, TelegramUserId,
+};
 
 #[derive(Debug, Error)]
 pub enum AppError {
@@ -13,6 +15,8 @@ pub enum AppError {
     NotFound,
     #[error("forbidden")]
     Forbidden,
+    #[error("invalid input: {0}")]
+    InvalidInput(String),
 }
 
 impl From<sqlx::Error> for AppError {
@@ -48,6 +52,18 @@ pub trait RequestRepository: Send + Sync {
         &self,
         request_id: HelpRequestId,
         helper_id: TelegramUserId,
+        request_version: u64,
+    ) -> Result<AcceptOutcome, AppError>;
+
+    /// Atomically accepts with the helper's travel estimate, anchored to the match.
+    /// # Errors
+    /// Returns invalid input for estimates outside 1..=240 minutes or storage errors.
+    async fn accept_with_arrival(
+        &self,
+        request_id: HelpRequestId,
+        helper_id: TelegramUserId,
+        request_version: u64,
+        estimate: Option<ArrivalEstimate>,
     ) -> Result<AcceptOutcome, AppError>;
 
     /// Cancels a draft/open/matched request as the requester.
@@ -154,7 +170,10 @@ where
         &self,
         request_id: HelpRequestId,
         helper_id: TelegramUserId,
+        request_version: u64,
     ) -> Result<AcceptOutcome, AppError> {
-        self.requests.accept(request_id, helper_id).await
+        self.requests
+            .accept(request_id, helper_id, request_version)
+            .await
     }
 }

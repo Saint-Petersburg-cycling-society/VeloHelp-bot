@@ -11,6 +11,7 @@ exec podman run \
     --rm \
     --name bike-aid \
     --read-only \
+    --read-only-tmpfs=false \
     --cap-drop=all \
     --security-opt=no-new-privileges \
     --user 65532:65532 \

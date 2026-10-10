@@ -9,25 +9,69 @@
 use teloxide_ui::{ButtonLabel, Ui};
 
 use super::Action;
-use crate::domain::{HelpRequest, HelpRequestStatus};
+use crate::domain::{HelpRequest, HelpRequestStatus, TelegramUserId};
 
-/// Stable icon id for one action. All ids exist in the manifest (SVG sources
-/// are a Codex follow-up; text labels carry meaning meanwhile).
+/// Stable icon id for one action. All IDs have sources and exports in the manifest.
 #[must_use]
-pub const fn icon_id(action: &Action) -> &'static str {
+pub fn icon_id(action: &Action) -> &'static str {
     match action {
         Action::OpenCreateRequest => "request.help",
         Action::OpenHelperSettings => "helper.profile",
-        Action::ToggleArea(_) => "location.area",
-        Action::ToggleCapability(_) => "problem.tools",
-        Action::WizardBack => "nav.back",
+        Action::ToggleArea(area) => match area.as_str() {
+            "spb-admiralteysky" => "area.admiralteysky",
+            "spb-frunzensky" => "area.frunzensky",
+            "spb-kalininsky" => "area.kalininsky",
+            "spb-kirovsky" => "area.kirovsky",
+            "spb-kolpinsky" => "area.kolpinsky",
+            "spb-krasnogvardeysky" => "area.krasnogvardeysky",
+            "spb-krasnoselsky" => "area.krasnoselsky",
+            "spb-kronshtadtsky" => "area.kronshtadtsky",
+            "spb-kurortny" => "area.kurortny",
+            "spb-moskovsky" => "area.moskovsky",
+            "spb-nevsky" => "area.nevsky",
+            "spb-petrodvortsovy" => "area.petrodvortsovy",
+            "spb-petrogradsky" => "area.petrogradsky",
+            "spb-primorsky" => "area.primorsky",
+            "spb-pushkinsky" => "area.pushkinsky",
+            "spb-tsentralny" => "area.tsentralny",
+            "spb-vasileostrovsky" => "area.vasileostrovsky",
+            "spb-vyborgsky" => "area.vyborgsky",
+            _ => "location.area",
+        },
+        Action::ToggleCapability(kind) => {
+            if kind == "accident" {
+                "problem.accident"
+            } else {
+                "problem.tools"
+            }
+        }
+        Action::SelectProblem(problem) => match problem.as_str() {
+            "puncture" => "problem.puncture",
+            "drivetrain" => "problem.drivetrain",
+            "brakes" => "problem.brakes",
+            "wheel" => "problem.wheel",
+            "transport" => "problem.transport",
+            "accident" => "problem.accident",
+            _ => "problem.tools",
+        },
+        Action::EditDescription => "action.edit",
+        Action::WizardBack | Action::ArrivalBack(_, _) | Action::AbortAccept(_) => "nav.back",
         Action::WizardNext => "nav.next",
         // Publish reuses the resolve checkmark until the icon pack lands.
         Action::PublishRequest | Action::Resolve(_) => "action.resolve",
-        Action::Accept(_) => "action.accept",
-        Action::Decline(_) => "action.decline",
+        Action::Accept(_, _) | Action::AcceptAt(_, _, _) | Action::SaveHelper => "action.accept",
+        Action::Decline(_, _) | Action::Withdraw(_) => "action.decline",
         Action::Cancel(_) => "action.cancel",
         Action::OpenSource => "action.source",
+        Action::Home => "nav.home",
+        Action::HelperAreas => "location.area",
+        Action::More
+        | Action::HelperOptions
+        | Action::ToggleEnabled
+        | Action::EnterArrival(_, _) => "nav.settings",
+        Action::Consent(_) | Action::Privacy | Action::ExportData => "privacy.data",
+        Action::ActiveRequests | Action::OpenRequest(_) => "status.open",
+        Action::ConfirmDelete | Action::DeleteData => "privacy.delete",
     }
 }
 
@@ -35,23 +79,52 @@ pub const fn icon_id(action: &Action) -> &'static str {
 #[must_use]
 pub fn action_label(action: &Action) -> String {
     match action {
-        Action::OpenCreateRequest => "Need help".to_owned(),
-        Action::OpenHelperSettings => "I can help".to_owned(),
-        Action::ToggleArea(area) => format!("Area: {area}"),
+        Action::OpenCreateRequest => "Нужна помощь".to_owned(),
+        Action::OpenHelperSettings => "Я могу помочь".to_owned(),
+        Action::ToggleArea(area) => format!("Район: {area}"),
         Action::ToggleCapability(cap) => format!("Help: {cap}"),
-        Action::WizardBack => "Back".to_owned(),
-        Action::WizardNext => "Next".to_owned(),
-        Action::PublishRequest => "Publish".to_owned(),
-        Action::Accept(_) => "Accept".to_owned(),
-        Action::Decline(_) => "Decline".to_owned(),
-        Action::Cancel(_) => "Cancel".to_owned(),
-        Action::Resolve(_) => "Resolve".to_owned(),
-        Action::OpenSource => "Source code".to_owned(),
+        Action::WizardBack | Action::AbortAccept(_) => "Назад".to_owned(),
+        Action::WizardNext => "Далее".to_owned(),
+        Action::PublishRequest => "Опубликовать".to_owned(),
+        Action::Accept(_, _) => "Помогу через…".to_owned(),
+        Action::AcceptAt(_, _, estimate) => estimate.label(),
+        Action::EnterArrival(_, _) => "Свои минуты".to_owned(),
+        Action::ArrivalBack(_, _) => "Варианты времени".to_owned(),
+        Action::Decline(_, _) => "Отклонить".to_owned(),
+        Action::Cancel(_) => "Отменить".to_owned(),
+        Action::Resolve(_) => "Помощь оказана".to_owned(),
+        Action::OpenSource => "Исходный код".to_owned(),
+        Action::Home => "Главная".to_owned(),
+        Action::More => "Ещё".to_owned(),
+        Action::HelperAreas => "Районы".to_owned(),
+        Action::HelperOptions => "Настройки".to_owned(),
+        Action::Consent(_) => "Согласен, продолжить".to_owned(),
+        Action::SelectProblem(problem) => match problem.as_str() {
+            "puncture" => "Прокол",
+            "drivetrain" => "Цепь / передачи",
+            "brakes" => "Тормоза",
+            "wheel" => "Колесо",
+            "transport" => "Перевезти велосипед",
+            "accident" => "Происшествие",
+            _ => "Инструменты",
+        }
+        .to_owned(),
+        Action::EditDescription => "Изменить описание".to_owned(),
+        Action::ToggleEnabled => "Включить / приостановить".to_owned(),
+        Action::SaveHelper => "Сохранить".to_owned(),
+        Action::ActiveRequests => "Активные заявки".to_owned(),
+        Action::OpenRequest(_) => "Открыть заявку".to_owned(),
+        Action::Privacy => "Мои данные".to_owned(),
+        Action::ExportData => "Скачать мои данные".to_owned(),
+        Action::ConfirmDelete => "Удалить мои данные".to_owned(),
+        Action::DeleteData => "Подтверждаю удаление".to_owned(),
+        Action::Withdraw(_) => "Не смогу помочь".to_owned(),
     }
 }
 
-fn button_row(action: Action) -> teloxide_ui::ButtonRow<Action> {
-    let label = format!("[{}] {}", icon_id(&action), action_label(&action));
+#[must_use]
+pub fn button_row(action: Action) -> teloxide_ui::ButtonRow<Action> {
+    let label = action_label(&action);
     teloxide_ui::Ui::button_row().push(teloxide_ui::Ui::button(ButtonLabel::from(label), action))
 }
 
@@ -59,7 +132,7 @@ fn button_row(action: Action) -> teloxide_ui::ButtonRow<Action> {
 #[must_use]
 pub fn home_view(show_active: bool, source_url: &str) -> Ui<Action> {
     let mut ui = Ui::column()
-        .push(Ui::heading("VeloHelp"))
+        .push(Ui::paragraph("VeloHelp"))
         .push(Ui::paragraph(
             "Voluntary peer assistance. The bot is not an emergency service.",
         ))
@@ -76,7 +149,7 @@ pub fn home_view(show_active: bool, source_url: &str) -> Ui<Action> {
 #[must_use]
 pub fn helper_setup_view(areas: &[String], kinds: &[String], enabled: bool) -> Ui<Action> {
     let mut ui = Ui::column()
-        .push(Ui::heading("Help settings"))
+        .push(Ui::paragraph("Help settings"))
         .push(Ui::paragraph(format!(
             "Enabled: {}",
             if enabled { "yes" } else { "no" }
@@ -95,50 +168,87 @@ pub fn helper_setup_view(areas: &[String], kinds: &[String], enabled: bool) -> U
 #[must_use]
 pub fn dispatch_card_view(request: &HelpRequest, area: &str) -> Ui<Action> {
     Ui::column()
-        .push(Ui::heading("Help needed"))
-        .push(Ui::paragraph(format!("Area: {area}")))
-        .push(Ui::paragraph(format!("Kind: {:?}", request.help_kind)))
+        .push(Ui::paragraph("Нужна помощь"))
+        .push(Ui::paragraph(format!("Район: {area}")))
+        .push(Ui::paragraph(format!(
+            "Тип: {}",
+            match request.help_kind {
+                crate::domain::HelpKind::Technical => "Техническая помощь",
+                crate::domain::HelpKind::Accident => "Происшествие",
+            }
+        )))
         .push(Ui::paragraph(request.description.clone()))
-        .push(button_row(Action::Accept(request.id)))
-        .push(button_row(Action::Decline(request.id)))
+        .push(Ui::paragraph(format!(
+            "Статус: {}",
+            status_text(request.status)
+        )))
+        .push(
+            if request.status == HelpRequestStatus::Open && request.expires_at > chrono::Utc::now()
+            {
+                Ui::fragment([
+                    button_row(Action::Accept(request.id, request.version)).into(),
+                    button_row(Action::Decline(request.id, request.version)).into(),
+                ])
+            } else {
+                Ui::paragraph("Заявка уже недоступна для приёма.")
+            },
+        )
 }
 
-/// Matched helper view: the only surface that discloses the exact point,
-/// and only after a won accept.
+/// Matched helper view: offers a native map action after a won accept.
+/// The adapter re-checks authoritative membership before sending the point.
 #[must_use]
-pub fn matched_helper_view(request: &HelpRequest) -> Ui<Action> {
+pub fn matched_helper_view(request: &HelpRequest, helper: TelegramUserId) -> Ui<Action> {
     let mut ui = Ui::column()
-        .push(Ui::heading("Matched"))
-        .push(Ui::paragraph(format!("Status: {:?}", request.status)));
-    if let Some(point) = request.exact_point {
-        ui = ui.push(Ui::paragraph(format!(
-            "Exact point: {:.5}, {:.5}",
-            point.lat, point.lon
+        .push(Ui::paragraph("Вы приняли заявку"))
+        .push(Ui::paragraph(format!(
+            "Статус: {}",
+            status_text(request.status)
         )));
+    if request.status != HelpRequestStatus::Matched || request.matched_helper_id != Some(helper) {
+        return dispatch_card_view(request, request.area_id.as_deref().unwrap_or("—"));
     }
-    ui.push(button_row(Action::Cancel(request.id)))
+    ui = ui.push(Ui::paragraph(request.description.clone()));
+    if let Some(bike) = &request.bike_description {
+        if !bike.is_empty() {
+            ui = ui.push(Ui::paragraph(format!("Велосипед: {bike}")));
+        }
+    }
+    ui.push(button_row(Action::Withdraw(request.id)))
 }
 
 /// Requester view of a matched request (no extra disclosure needed).
 #[must_use]
 pub fn matched_requester_view(request: &HelpRequest) -> Ui<Action> {
-    Ui::column()
-        .push(Ui::heading("Helper found"))
-        .push(Ui::paragraph(format!("Status: {:?}", request.status)))
-        .push(button_row(Action::Resolve(request.id)))
-        .push(button_row(Action::Cancel(request.id)))
+    let mut ui = Ui::column()
+        .push(Ui::paragraph("Ваша заявка"))
+        .push(Ui::paragraph(format!(
+            "Статус: {}",
+            status_text(request.status)
+        )))
+        .push(Ui::paragraph(request.description.clone()));
+    if request.status == HelpRequestStatus::Matched {
+        ui = ui.push(button_row(Action::Resolve(request.id)));
+    }
+    if matches!(
+        request.status,
+        HelpRequestStatus::Draft | HelpRequestStatus::Open | HelpRequestStatus::Matched
+    ) {
+        ui = ui.push(button_row(Action::Cancel(request.id)));
+    }
+    ui.push(button_row(Action::Home))
 }
 
 /// Status badge text for a request.
 #[must_use]
 pub fn status_text(status: HelpRequestStatus) -> &'static str {
     match status {
-        HelpRequestStatus::Draft => "Draft",
-        HelpRequestStatus::Open => "Open",
-        HelpRequestStatus::Matched => "Matched",
-        HelpRequestStatus::Resolved => "Resolved",
-        HelpRequestStatus::Cancelled => "Cancelled",
-        HelpRequestStatus::Expired => "Expired",
+        HelpRequestStatus::Draft => "Черновик",
+        HelpRequestStatus::Open => "Открыта",
+        HelpRequestStatus::Matched => "Помощник найден",
+        HelpRequestStatus::Resolved => "Помощь оказана",
+        HelpRequestStatus::Cancelled => "Отменена",
+        HelpRequestStatus::Expired => "Срок истёк",
     }
 }
 
@@ -146,7 +256,7 @@ pub fn status_text(status: HelpRequestStatus) -> &'static str {
 #[must_use]
 pub fn source_view(source_url: &str) -> Ui<Action> {
     Ui::column()
-        .push(Ui::heading("Source code"))
+        .push(Ui::paragraph("Source code"))
         .push(Ui::paragraph(format!("Corresponding Source: {source_url}")))
         .push(button_row(Action::OpenSource))
 }
@@ -155,12 +265,27 @@ pub fn source_view(source_url: &str) -> Ui<Action> {
 #[must_use]
 pub fn privacy_view(consent_version: &str) -> Ui<Action> {
     Ui::column()
-        .push(Ui::heading("My data"))
+        .push(Ui::paragraph("My data"))
         .push(Ui::paragraph(format!("Consent version: {consent_version}")))
         .push(Ui::paragraph(
             "We store Telegram ID, helper settings, coarse areas, requests and the exact point of the active request only.",
         ))
         .push(button_row(Action::OpenHelperSettings))
+}
+
+/// Human readable category name; custom emoji never carries the only meaning.
+#[must_use]
+pub fn tag_label(tag: &str) -> &str {
+    match tag {
+        "puncture" => "Прокол",
+        "drivetrain" => "Трансмиссия",
+        "brakes" => "Тормоза",
+        "wheel" => "Колесо",
+        "tools" => "Инструменты",
+        "transport" => "Перевозка",
+        "other" => "Другое",
+        _ => tag,
+    }
 }
 
 #[cfg(test)]
@@ -180,6 +305,7 @@ mod tests {
             bike_description: None,
             status: HelpRequestStatus::Open,
             matched_helper_id: None,
+            arrival_window: None,
             exact_point: crate::domain::GeoPoint::new(59.9, 30.3),
             area_id: Some("spb-center".to_owned()),
             expires_at: Utc::now() + TimeDelta::minutes(60),
@@ -197,18 +323,24 @@ mod tests {
     }
 
     #[test]
-    fn matched_helper_shows_exact_point() {
+    fn matched_helper_has_no_extra_contact_or_location_button() {
         let req = sample_request();
-        let ui = matched_helper_view(&req);
+        let mut req = req;
+        req.status = HelpRequestStatus::Matched;
+        req.matched_helper_id = Some(TelegramUserId(2));
+        let ui = matched_helper_view(&req, TelegramUserId(2));
         let rendered = format!("{ui:?}");
-        assert!(rendered.contains("59.9"));
+        assert!(rendered.contains("Withdraw"));
+        assert!(!rendered.contains("Связаться в Telegram"));
+        assert!(!rendered.contains("59.9"));
+        assert!(!rendered.contains("30.3"));
     }
 
     #[test]
     fn no_bicycle_emoji_in_labels() {
         let actions = [
             Action::OpenCreateRequest,
-            Action::Accept(sample_request().id),
+            Action::Accept(sample_request().id, 0),
         ];
         for action in actions {
             let label = action_label(&action);

@@ -6,7 +6,7 @@ rust-version = "1.88"
 license = "AGPL-3.0-only"
 publish = false
 description = "Telegram mutual-aid bot for cyclists"
-repository = "https://github.com/OWNER/bike-aid"
+repository = "https://github.com/Saint-Petersburg-cycling-society/VeloHelp-bot"
 
 [dependencies]
 anyhow = "1"

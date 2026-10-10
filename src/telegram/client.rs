@@ -18,6 +18,8 @@ pub fn telegram_http_client() -> Result<Client, reqwest::Error> {
         .collect::<Result<Vec<_>, _>>()?;
 
     Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(45))
         .tls_certs_only(roots)
         .https_only(true)
         .build()

@@ -34,9 +34,27 @@ pub fn actor_policy(action: &Action, actor: UserId, owner: Option<UserId>) -> Ac
 pub const fn stale_policy(action: &Action) -> StalePolicy {
     match action {
         // Winner selection must reject stale tokens.
-        Action::Accept(_) => StalePolicy::Reject,
+        Action::Accept(_, _)
+        | Action::AcceptAt(_, _, _)
+        | Action::EnterArrival(_, _)
+        | Action::ArrivalBack(_, _)
+        | Action::AbortAccept(_)
+        | Action::Withdraw(_)
+        | Action::PublishRequest
+        | Action::DeleteData
+        | Action::SaveHelper
+        | Action::Consent(_)
+        | Action::ToggleArea(_)
+        | Action::ToggleCapability(_)
+        | Action::HelperAreas
+        | Action::HelperOptions
+        | Action::ToggleEnabled
+        | Action::WizardNext
+        | Action::WizardBack
+        | Action::SelectProblem(_)
+        | Action::EditDescription => StalePolicy::Reject,
         // Decline/cancel/resolve apply to the latest state safely.
-        Action::Decline(_) | Action::Cancel(_) | Action::Resolve(_) | Action::PublishRequest => {
+        Action::Decline(_, _) | Action::Cancel(_) | Action::Resolve(_) => {
             StalePolicy::ApplyToLatest
         }
         // Navigation is idempotent.
@@ -48,7 +66,7 @@ pub const fn stale_policy(action: &Action) -> StalePolicy {
 #[must_use]
 pub const fn action_ttl(action: &Action) -> Option<Duration> {
     match action {
-        Action::Accept(_) | Action::Decline(_) => Some(DISPATCH_ACTION_TTL),
+        Action::Accept(_, _) | Action::Decline(_, _) => Some(DISPATCH_ACTION_TTL),
         _ => None,
     }
 }
@@ -62,12 +80,12 @@ mod tests {
     #[test]
     fn accept_rejects_stale() {
         let id = HelpRequestId(Uuid::new_v4());
-        assert_eq!(stale_policy(&Action::Accept(id)), StalePolicy::Reject);
+        assert_eq!(stale_policy(&Action::Accept(id, 0)), StalePolicy::Reject);
     }
 
     #[test]
     fn navigation_is_idempotent() {
-        assert_eq!(stale_policy(&Action::WizardBack), StalePolicy::Idempotent);
+        assert_eq!(stale_policy(&Action::Home), StalePolicy::Idempotent);
     }
 
     #[test]
@@ -78,7 +96,7 @@ mod tests {
         assert_eq!(policy, ActorPolicy::Any);
         // Dispatch actions bind to the owner, foreign users are rejected.
         let id = HelpRequestId(Uuid::new_v4());
-        let policy = actor_policy(&Action::Accept(id), UserId(99), Some(UserId(7)));
+        let policy = actor_policy(&Action::Accept(id, 0), UserId(99), Some(UserId(7)));
         assert_eq!(policy, ActorPolicy::User(UserId(7)));
     }
 }

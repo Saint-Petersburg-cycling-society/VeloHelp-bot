@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Приватное сообщение об уязвимости / Private vulnerability report
+    url: https://github.com/Saint-Petersburg-cycling-society/VeloHelp-bot/security/advisories/new
+    about: Для проблем безопасности / For security issues

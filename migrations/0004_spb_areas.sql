@@ -1,0 +1,20 @@
+-- Coarse districts chosen explicitly by the user; no inferred GPS boundaries.
+INSERT OR IGNORE INTO areas (id, kind, display_name, sort_key) VALUES
+('spb-admiralteysky', 'district', 'Адмиралтейский', 1),
+('spb-vasileostrovsky', 'district', 'Василеостровский', 2),
+('spb-vyborgsky', 'district', 'Выборгский', 3),
+('spb-kalininsky', 'district', 'Калининский', 4),
+('spb-kirovsky', 'district', 'Кировский', 5),
+('spb-kolpinsky', 'district', 'Колпинский', 6),
+('spb-krasnogvardeysky', 'district', 'Красногвардейский', 7),
+('spb-krasnoselsky', 'district', 'Красносельский', 8),
+('spb-kronshtadtsky', 'district', 'Кронштадтский', 9),
+('spb-kurortny', 'district', 'Курортный', 10),
+('spb-moskovsky', 'district', 'Московский', 11),
+('spb-nevsky', 'district', 'Невский', 12),
+('spb-petrogradsky', 'district', 'Петроградский', 13),
+('spb-petrodvortsovy', 'district', 'Петродворцовый', 14),
+('spb-primorsky', 'district', 'Приморский', 15),
+('spb-pushkinsky', 'district', 'Пушкинский', 16),
+('spb-frunzensky', 'district', 'Фрунзенский', 17),
+('spb-tsentralny', 'district', 'Центральный', 18);

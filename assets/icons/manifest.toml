@@ -1,174 +1,463 @@
-version = 1
-
-# Fill `custom_emoji_id` after the project icon pack is uploaded.
-# Keep semantic IDs stable after public release.
-# Full required set per docs/DESIGN_SYSTEM.md. Sources in `src/*.svg`
-# are still TODO (v0 stub): entries reserve IDs and export paths.
+version = 2
+# Original project artwork: black contour + blue #137BB2, white disc, transparent outside.
+# Leave IDs empty until Telegram registration; never invent custom emoji IDs.
 
 [[icon]]
 id = "nav.home"
 source = "src/nav-home.svg"
 generated = "generated/nav-home.png"
-custom_emoji_id = ""
+custom_emoji_id = "5355228398773907202"
+label_ru = "Главная"
+label_en = "nav home"
+emoji = "🏠"
+webp = "generated/nav-home.webp"
 
 [[icon]]
 id = "nav.back"
 source = "src/nav-back.svg"
 generated = "generated/nav-back.png"
-custom_emoji_id = ""
+custom_emoji_id = "5357451310637559478"
+label_ru = "Назад"
+label_en = "nav back"
+emoji = "⬅️"
+webp = "generated/nav-back.webp"
 
 [[icon]]
 id = "nav.next"
 source = "src/nav-next.svg"
 generated = "generated/nav-next.png"
-custom_emoji_id = ""
+custom_emoji_id = "5355272362059146484"
+label_ru = "Далее"
+label_en = "nav next"
+emoji = "➡️"
+webp = "generated/nav-next.webp"
 
 [[icon]]
 id = "nav.settings"
 source = "src/nav-settings.svg"
 generated = "generated/nav-settings.png"
-custom_emoji_id = ""
+custom_emoji_id = "5354790711541672391"
+label_ru = "Настройки"
+label_en = "nav settings"
+emoji = "⚙️"
+webp = "generated/nav-settings.webp"
 
 [[icon]]
 id = "action.accept"
 source = "src/action-accept.svg"
 generated = "generated/action-accept.png"
-custom_emoji_id = ""
+custom_emoji_id = "5357324806670820987"
+label_ru = "Принять"
+label_en = "action accept"
+emoji = "✅"
+webp = "generated/action-accept.webp"
 
 [[icon]]
 id = "action.decline"
 source = "src/action-decline.svg"
 generated = "generated/action-decline.png"
-custom_emoji_id = ""
+custom_emoji_id = "5354954160817092686"
+label_ru = "Отклонить"
+label_en = "action decline"
+emoji = "➖"
+webp = "generated/action-decline.webp"
 
 [[icon]]
 id = "action.cancel"
 source = "src/action-cancel.svg"
 generated = "generated/action-cancel.png"
-custom_emoji_id = ""
+custom_emoji_id = "5357210904138131712"
+label_ru = "Отменить"
+label_en = "action cancel"
+emoji = "❌"
+webp = "generated/action-cancel.webp"
 
 [[icon]]
 id = "action.resolve"
 source = "src/action-resolve.svg"
 generated = "generated/action-resolve.png"
-custom_emoji_id = ""
+custom_emoji_id = "5357237713323991389"
+label_ru = "Завершить"
+label_en = "action resolve"
+emoji = "☑️"
+webp = "generated/action-resolve.webp"
 
 [[icon]]
 id = "action.edit"
 source = "src/action-edit.svg"
 generated = "generated/action-edit.png"
-custom_emoji_id = ""
+custom_emoji_id = "5355217433722396258"
+label_ru = "Изменить"
+label_en = "action edit"
+emoji = "✏️"
+webp = "generated/action-edit.webp"
 
 [[icon]]
 id = "action.source"
 source = "src/action-source.svg"
 generated = "generated/action-source.png"
-custom_emoji_id = ""
+custom_emoji_id = "5355002943055637327"
+label_ru = "Исходный код"
+label_en = "action source"
+emoji = "💻"
+webp = "generated/action-source.webp"
 
 [[icon]]
 id = "request.help"
 source = "src/request-help.svg"
 generated = "generated/request-help.png"
-custom_emoji_id = ""
+custom_emoji_id = "5355213490942422497"
+label_ru = "Нужна помощь"
+label_en = "request help"
+emoji = "🆘"
+webp = "generated/request-help.webp"
 
 [[icon]]
 id = "helper.profile"
 source = "src/helper-profile.svg"
 generated = "generated/helper-profile.png"
-custom_emoji_id = ""
+custom_emoji_id = "5357279383096700749"
+label_ru = "Помощник"
+label_en = "helper profile"
+emoji = "🤝"
+webp = "generated/helper-profile.webp"
 
 [[icon]]
 id = "location.point"
 source = "src/location-point.svg"
 generated = "generated/location-point.png"
-custom_emoji_id = ""
+custom_emoji_id = "5354781455887148855"
+label_ru = "Точная точка"
+label_en = "location point"
+emoji = "📍"
+webp = "generated/location-point.webp"
 
 [[icon]]
 id = "location.area"
 source = "src/location-area.svg"
 generated = "generated/location-area.png"
-custom_emoji_id = ""
+custom_emoji_id = "5355147979806255737"
+label_ru = "Район"
+label_en = "location area"
+emoji = "🗺️"
+webp = "generated/location-area.webp"
 
 [[icon]]
 id = "problem.puncture"
 source = "src/problem-puncture.svg"
 generated = "generated/problem-puncture.png"
-custom_emoji_id = ""
+custom_emoji_id = "5355183035329325380"
+label_ru = "Прокол"
+label_en = "problem puncture"
+emoji = "🛞"
+webp = "generated/problem-puncture.webp"
 
 [[icon]]
 id = "problem.drivetrain"
 source = "src/problem-drivetrain.svg"
 generated = "generated/problem-drivetrain.png"
-custom_emoji_id = ""
+custom_emoji_id = "5355080205222324067"
+label_ru = "Трансмиссия"
+label_en = "problem drivetrain"
+emoji = "🔗"
+webp = "generated/problem-drivetrain.webp"
 
 [[icon]]
 id = "problem.brakes"
 source = "src/problem-brakes.svg"
 generated = "generated/problem-brakes.png"
-custom_emoji_id = ""
+custom_emoji_id = "5357291735422641790"
+label_ru = "Тормоза"
+label_en = "problem brakes"
+emoji = "🛑"
+webp = "generated/problem-brakes.webp"
 
 [[icon]]
 id = "problem.wheel"
 source = "src/problem-wheel.svg"
 generated = "generated/problem-wheel.png"
-custom_emoji_id = ""
+custom_emoji_id = "5354798820439929119"
+label_ru = "Колесо"
+label_en = "problem wheel"
+emoji = "🛞"
+webp = "generated/problem-wheel.webp"
 
 [[icon]]
 id = "problem.tools"
 source = "src/problem-tools.svg"
 generated = "generated/problem-tools.png"
-custom_emoji_id = ""
+custom_emoji_id = "5354971426585618326"
+label_ru = "Инструменты"
+label_en = "problem tools"
+emoji = "🔧"
+webp = "generated/problem-tools.webp"
 
 [[icon]]
 id = "problem.transport"
 source = "src/problem-transport.svg"
 generated = "generated/problem-transport.png"
-custom_emoji_id = ""
+custom_emoji_id = "5355273783693323469"
+label_ru = "Перевозка"
+label_en = "problem transport"
+emoji = "🚐"
+webp = "generated/problem-transport.webp"
 
 [[icon]]
 id = "problem.accident"
 source = "src/problem-accident.svg"
 generated = "generated/problem-accident.png"
-custom_emoji_id = ""
+custom_emoji_id = "5355278198919702772"
+label_ru = "Происшествие"
+label_en = "problem accident"
+emoji = "⚠️"
+webp = "generated/problem-accident.webp"
 
 [[icon]]
 id = "problem.other"
 source = "src/problem-other.svg"
 generated = "generated/problem-other.png"
-custom_emoji_id = ""
+custom_emoji_id = "5355078757818346247"
+label_ru = "Другая проблема"
+label_en = "problem other"
+emoji = "❔"
+webp = "generated/problem-other.webp"
 
 [[icon]]
 id = "status.open"
 source = "src/status-open.svg"
 generated = "generated/status-open.png"
-custom_emoji_id = ""
+custom_emoji_id = "5354825380517683309"
+label_ru = "Открыта"
+label_en = "status open"
+emoji = "📄"
+webp = "generated/status-open.webp"
 
 [[icon]]
 id = "status.matched"
 source = "src/status-matched.svg"
 generated = "generated/status-matched.png"
-custom_emoji_id = ""
+custom_emoji_id = "5355109110352226997"
+label_ru = "Пара найдена"
+label_en = "status matched"
+emoji = "🤝"
+webp = "generated/status-matched.webp"
 
 [[icon]]
 id = "status.resolved"
 source = "src/status-resolved.svg"
 generated = "generated/status-resolved.png"
-custom_emoji_id = ""
+custom_emoji_id = "5357397357258386502"
+label_ru = "Помощь оказана"
+label_en = "status resolved"
+emoji = "✅"
+webp = "generated/status-resolved.webp"
 
 [[icon]]
 id = "status.expired"
 source = "src/status-expired.svg"
 generated = "generated/status-expired.png"
-custom_emoji_id = ""
+custom_emoji_id = "5354932020260676299"
+label_ru = "Срок истёк"
+label_en = "status expired"
+emoji = "⌛"
+webp = "generated/status-expired.webp"
 
 [[icon]]
 id = "privacy.data"
 source = "src/privacy-data.svg"
 generated = "generated/privacy-data.png"
-custom_emoji_id = ""
+custom_emoji_id = "5355274183125280516"
+label_ru = "Мои данные"
+label_en = "privacy data"
+emoji = "🔒"
+webp = "generated/privacy-data.webp"
 
 [[icon]]
 id = "privacy.delete"
 source = "src/privacy-delete.svg"
 generated = "generated/privacy-delete.png"
-custom_emoji_id = ""
+custom_emoji_id = "5355176837691517843"
+label_ru = "Удалить данные"
+label_en = "privacy delete"
+emoji = "🗑️"
+webp = "generated/privacy-delete.webp"
+
+[[icon]]
+id = "area.admiralteysky"
+source = "src/area-admiralteysky.svg"
+generated = "generated/area-admiralteysky.png"
+custom_emoji_id = "5354784750127066217"
+label_ru = "Адмиралтейский"
+label_en = "admiralteysky district"
+emoji = "🏛️"
+webp = "generated/area-admiralteysky.webp"
+
+[[icon]]
+id = "area.vasileostrovsky"
+source = "src/area-vasileostrovsky.svg"
+generated = "generated/area-vasileostrovsky.png"
+custom_emoji_id = "5355293781061053866"
+label_ru = "Василеостровский"
+label_en = "vasileostrovsky district"
+emoji = "🏛️"
+webp = "generated/area-vasileostrovsky.webp"
+
+[[icon]]
+id = "area.vyborgsky"
+source = "src/area-vyborgsky.svg"
+generated = "generated/area-vyborgsky.png"
+custom_emoji_id = "5357479739026090107"
+label_ru = "Выборгский"
+label_en = "vyborgsky district"
+emoji = "🏛️"
+webp = "generated/area-vyborgsky.webp"
+
+[[icon]]
+id = "area.kalininsky"
+source = "src/area-kalininsky.svg"
+generated = "generated/area-kalininsky.png"
+custom_emoji_id = "5354962467283841142"
+label_ru = "Калининский"
+label_en = "kalininsky district"
+emoji = "🚂"
+webp = "generated/area-kalininsky.webp"
+
+[[icon]]
+id = "area.kirovsky"
+source = "src/area-kirovsky.svg"
+generated = "generated/area-kirovsky.png"
+custom_emoji_id = "5355274337744103922"
+label_ru = "Кировский"
+label_en = "kirovsky district"
+emoji = "🏛️"
+webp = "generated/area-kirovsky.webp"
+
+[[icon]]
+id = "area.kolpinsky"
+source = "src/area-kolpinsky.svg"
+generated = "generated/area-kolpinsky.png"
+custom_emoji_id = "5354947542272486973"
+label_ru = "Колпинский"
+label_en = "kolpinsky district"
+emoji = "🏭"
+webp = "generated/area-kolpinsky.webp"
+
+[[icon]]
+id = "area.krasnogvardeysky"
+source = "src/area-krasnogvardeysky.svg"
+generated = "generated/area-krasnogvardeysky.png"
+custom_emoji_id = "5355324610336301860"
+label_ru = "Красногвардейский"
+label_en = "krasnogvardeysky district"
+emoji = "🌉"
+webp = "generated/area-krasnogvardeysky.webp"
+
+[[icon]]
+id = "area.krasnoselsky"
+source = "src/area-krasnoselsky.svg"
+generated = "generated/area-krasnoselsky.png"
+custom_emoji_id = "5355127402617941265"
+label_ru = "Красносельский"
+label_en = "krasnoselsky district"
+emoji = "⛰️"
+webp = "generated/area-krasnoselsky.webp"
+
+[[icon]]
+id = "area.kronshtadtsky"
+source = "src/area-kronshtadtsky.svg"
+generated = "generated/area-kronshtadtsky.png"
+custom_emoji_id = "5357052063362623930"
+label_ru = "Кронштадтский"
+label_en = "kronshtadtsky district"
+emoji = "🏛️"
+webp = "generated/area-kronshtadtsky.webp"
+
+[[icon]]
+id = "area.kurortny"
+source = "src/area-kurortny.svg"
+generated = "generated/area-kurortny.png"
+custom_emoji_id = "5354782606938392337"
+label_ru = "Курортный"
+label_en = "kurortny district"
+emoji = "🏖️"
+webp = "generated/area-kurortny.webp"
+
+[[icon]]
+id = "area.moskovsky"
+source = "src/area-moskovsky.svg"
+generated = "generated/area-moskovsky.png"
+custom_emoji_id = "5357055726969728326"
+label_ru = "Московский"
+label_en = "moskovsky district"
+emoji = "🏛️"
+webp = "generated/area-moskovsky.webp"
+
+[[icon]]
+id = "area.nevsky"
+source = "src/area-nevsky.svg"
+generated = "generated/area-nevsky.png"
+custom_emoji_id = "5354803218486435330"
+label_ru = "Невский"
+label_en = "nevsky district"
+emoji = "🌉"
+webp = "generated/area-nevsky.webp"
+
+[[icon]]
+id = "area.petrogradsky"
+source = "src/area-petrogradsky.svg"
+generated = "generated/area-petrogradsky.png"
+custom_emoji_id = "5354953044125590532"
+label_ru = "Петроградский"
+label_en = "petrogradsky district"
+emoji = "🏛️"
+webp = "generated/area-petrogradsky.webp"
+
+[[icon]]
+id = "area.petrodvortsovy"
+source = "src/area-petrodvortsovy.svg"
+generated = "generated/area-petrodvortsovy.png"
+custom_emoji_id = "5355066933773380322"
+label_ru = "Петродворцовый"
+label_en = "petrodvortsovy district"
+emoji = "⛲"
+webp = "generated/area-petrodvortsovy.webp"
+
+[[icon]]
+id = "area.primorsky"
+source = "src/area-primorsky.svg"
+generated = "generated/area-primorsky.png"
+custom_emoji_id = "5355023820891661873"
+label_ru = "Приморский"
+label_en = "primorsky district"
+emoji = "🏙️"
+webp = "generated/area-primorsky.webp"
+
+[[icon]]
+id = "area.pushkinsky"
+source = "src/area-pushkinsky.svg"
+generated = "generated/area-pushkinsky.png"
+custom_emoji_id = "5355024744309630650"
+label_ru = "Пушкинский"
+label_en = "pushkinsky district"
+emoji = "🏛️"
+webp = "generated/area-pushkinsky.webp"
+
+[[icon]]
+id = "area.frunzensky"
+source = "src/area-frunzensky.svg"
+generated = "generated/area-frunzensky.png"
+custom_emoji_id = "5355229412386187726"
+label_ru = "Фрунзенский"
+label_en = "frunzensky district"
+emoji = "🚇"
+webp = "generated/area-frunzensky.webp"
+
+[[icon]]
+id = "area.tsentralny"
+source = "src/area-tsentralny.svg"
+generated = "generated/area-tsentralny.png"
+custom_emoji_id = "5355232650791529358"
+label_ru = "Центральный"
+label_en = "tsentralny district"
+emoji = "🏛️"
+webp = "generated/area-tsentralny.webp"

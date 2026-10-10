@@ -20,6 +20,7 @@ UserNS=keep-id:uid=65532,gid=65532
 Volume=%h/.local/share/bike-aid:/data:Z
 
 ReadOnly=true
+ReadOnlyTmpfs=false
 NoNewPrivileges=true
 DropCapability=all
 

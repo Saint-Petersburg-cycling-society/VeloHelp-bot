@@ -17,7 +17,8 @@
 ### Phase 1 — backend/domain
 - [x] SQLite repositories
 - [x] helper profile
-- [x] area resolver
+- [x] helper district catalog / каталог районов помощника
+- [x] local GPS area resolver / район заявки по геопозиции
 - [x] create/cancel/expire
 - [x] matching
 - [x] atomic accept
@@ -36,9 +37,12 @@
 - [x] callback dispatcher + ACK
 - [x] per-action policy
 - [x] external input primitive
-- [x] multi-surface effect executor
-- [x] persistence/recovery
-- [x] cross-view invalidation
+- [x] post-commit multi-surface projection
+- [ ] durable projection retry queue
+- [x] domain recovery via /active
+- [ ] durable wizard/capability recovery
+- [x] cross-view invalidation on active transitions
+- [ ] durable requester-surface recovery
 - [x] reusable components
 
 ### Phase 4 — operations
@@ -49,6 +53,8 @@
 - [x] deletion/export
 - [x] source/legal UI
 - [x] deployment hardening
+- [ ] live Telegram smoke with real token
+- [x] Telegram emoji registration/custom ID binding
 
 ## EN
 
@@ -67,7 +73,8 @@
 ### Phase 1 — backend/domain
 - [x] SQLite repositories
 - [x] helper profile
-- [x] area resolver
+- [x] helper district catalog / каталог районов помощника
+- [x] local GPS area resolver / район заявки по геопозиции
 - [x] create/cancel/expire
 - [x] matching
 - [x] atomic accept
@@ -86,9 +93,12 @@
 - [x] callback dispatcher + ACK
 - [x] per-action policy
 - [x] external input primitive
-- [x] multi-surface effect executor
-- [x] persistence/recovery
-- [x] cross-view invalidation
+- [x] post-commit multi-surface projection
+- [ ] durable projection retry queue
+- [x] domain recovery via /active
+- [ ] durable wizard/capability recovery
+- [x] cross-view invalidation on active transitions
+- [ ] durable requester-surface recovery
 - [x] reusable components
 
 ### Phase 4 — operations
@@ -99,3 +109,5 @@
 - [x] deletion/export
 - [x] source/legal UI
 - [x] deployment hardening
+- [ ] live Telegram smoke with real token
+- [x] Telegram emoji registration/custom ID binding

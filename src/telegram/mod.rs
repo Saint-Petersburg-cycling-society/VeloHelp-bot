@@ -12,6 +12,8 @@
 
 mod client;
 mod handler;
+mod runtime;
+pub use runtime::run_polling;
 
 pub use client::telegram_http_client;
 pub use handler::{describe_event, ExternalInput, TelegramEvent};
