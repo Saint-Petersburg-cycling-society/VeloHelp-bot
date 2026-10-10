@@ -221,7 +221,7 @@ Required:
 Отладка выполняется отдельным debug image/toolbox, production image остаётся
 `scratch`.
 
-### 10. Privacy and safety
+### 11. Privacy and safety
 
 - exact requester point не попадает в fan-out notification;
 - до match helper видит coarse area;
@@ -231,7 +231,7 @@ Required:
 - каждый новый persisted personal-data field требует purpose + retention;
 - emergency/medical/legal flows не изображают профессиональную службу.
 
-### 11. License boundary
+### 12. License boundary
 
 `bike-aid`: AGPL-3.0-only.
 `teloxide-ui`: MIT.
@@ -242,7 +242,7 @@ Generic idea/primitive реализуется заново в правильно
 Публичная модифицированная инстанция должна иметь видимый путь к Corresponding
 Source согласно AGPL.
 
-### 12. Quality gate
+### 13. Quality gate
 
 Перед merge:
 - `cargo fmt --all -- --check`;
@@ -329,31 +329,6 @@ migration to PostgreSQL/client-server storage.
 
 ### 10. Production runtime
 
-Production packaging MUST be container-first:
-
-```text
-Alpine/musl builder -> FROM scratch -> rootless Podman
-```
-
-Required:
-- final image без shell/package manager/general userspace;
-- numeric non-root process;
-- rootless Podman;
-- read-only rootfs;
-- drop all Linux capabilities;
-- no-new-privileges;
-- никаких published ports при long polling;
-- writable только `/data`;
-- CA roots compiled into binary, не системный trust store;
-- application binary не устанавливается непосредственно в host rootfs.
-
-Не добавляй Alpine/Debian runtime layer “для удобства отладки”.
-Отладка выполняется отдельным debug image/toolbox, production image остаётся
-`scratch`.
-
-
-### 10. Production runtime
-
 Production packaging is Alpine/musl **builder only**, followed by a `FROM
 scratch` image running under rootless Podman.
 
@@ -365,17 +340,17 @@ writable. TLS roots are compiled into the executable.
 Do not add an Alpine/Debian production runtime merely for debugging
 convenience; use a separate debug image/toolbox.
 
-### 10. Privacy and safety
+### 11. Privacy and safety
 
 Minimize personal data, keep exact requester coordinates out of fan-out
 notifications, avoid continuous tracking and keep retention explicit.
 
-### 11. License boundary
+### 12. License boundary
 
 `bike-aid` is AGPL-3.0-only; `teloxide-ui` is MIT. Preserve the boundary and
 provide a visible Corresponding Source path for public modified deployments.
 
-### 12. Quality gate
+### 13. Quality gate
 
 Formatting, clippy, tests, migrations, bilingual docs, icon-manifest coverage,
 race tests and the no-unsafe rule all gate merge.

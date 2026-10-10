@@ -17,6 +17,7 @@ pub struct GeoPoint {
 }
 
 impl GeoPoint {
+    #[must_use]
     pub fn new(lat: f64, lon: f64) -> Option<Self> {
         (-90.0..=90.0)
             .contains(&lat)

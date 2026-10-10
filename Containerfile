@@ -9,13 +9,12 @@ RUN apk add --no-cache \
 
 WORKDIR /src
 
-COPY Cargo.toml rust-toolchain.toml build.rs ./
+COPY Cargo.toml Cargo.lock rust-toolchain.toml build.rs ./
 COPY src ./src
 COPY migrations ./migrations
 
-# Cargo.lock is intentionally expected to be committed once generated.
-# Use --locked in CI/release as soon as the first lockfile exists.
-RUN cargo build --release
+# Cargo.lock is committed; release builds MUST be reproducible.
+RUN cargo build --release --locked
 
 RUN strip /src/target/release/bike-aid
 

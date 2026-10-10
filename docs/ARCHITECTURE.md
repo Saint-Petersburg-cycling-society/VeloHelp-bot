@@ -59,26 +59,57 @@ SQLite уже не обслуживает.
 
 ### Frontend/backend boundary
 
-Telegram adaptation and `teloxide-ui` form the frontend. Domain, application
-services and SQLite persistence form the backend. UI code never performs SQL
-directly; domain code does not depend on Telegram types.
+```text
+Telegram
+   ↓
+telegram/ + ui/                 FRONTEND
+   ↓ typed command/event
+application/ + domain/          BACKEND
+   ↓
+storage/ SQLite
+```
+
+Frontend owns input, rendering, `Surface`, `ViewId`, `Revision`,
+capabilities and projection. Backend owns domain invariants, matching and
+authoritative transactions.
+
+`ui/` MUST NOT import SQLx. `domain/` MUST NOT import teloxide.
 
 ### Accept
 
-The accept command is an atomic conditional database write followed by
-post-commit projection. No Telegram I/O occurs inside the transaction.
+```text
+callback
+→ resolve actor/stale capability
+→ application::accept(request_id, helper_id)
+→ atomic conditional UPDATE
+→ commit
+→ domain outcome
+→ reproject requester + N dispatch views
+```
+
+No Telegram I/O inside the DB transaction.
 
 ### Multi-view model
 
-One domain request may have many independent Telegram views. They share domain
+```text
+HelpRequest #42
+├─ requester view
+├─ helper A dispatch view
+├─ helper B dispatch view
+└─ helper C dispatch view
+```
+
+Views have independent revisions and surfaces. They share domain
 truth but not UI revision identity.
 
 ### SQLite
 
-The single-host MVP uses SQLite/WAL on a local filesystem with one pooled
-connection initially. PostgreSQL becomes appropriate when the application
-requires multiple hosts, a remote DB service or measured write concurrency
-beyond SQLite's single-writer model.
+Single-host MVP uses SQLite/WAL on a local filesystem. The initial pool is one
+connection. No network filesystem for the live DB.
+
+PostgreSQL becomes justified with multiple application hosts, a separate
+network DB service, or measured write concurrency that single-writer
+SQLite no longer serves.
 
 
 ## Runtime isolation / Изоляция runtime

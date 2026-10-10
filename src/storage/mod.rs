@@ -7,6 +7,12 @@ use sqlx::{
     SqlitePool,
 };
 
+/// Connects to the SQLite database with the MVP contract (WAL, FULL synchronous,
+/// foreign keys, 5s busy timeout, single connection).
+///
+/// # Errors
+///
+/// Returns [`sqlx::Error`] when the URL is invalid or the pool cannot be created.
 pub async fn connect(database_url: &str) -> Result<SqlitePool, sqlx::Error> {
     let options = SqliteConnectOptions::from_str(database_url)?
         .create_if_missing(true)

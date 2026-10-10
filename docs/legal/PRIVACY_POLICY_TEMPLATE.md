@@ -55,3 +55,26 @@ Telegram-бот взаимопомощи велосипедистов `[BOT_USER
 ## 8. Контакт
 
 `[ЗАПОЛНИТЬ]`
+
+---
+
+## EN summary / Инженерное резюме
+
+> Not a final legal document. Do not publish without filling in the operator
+> details and a legal review of the actual deployment.
+
+- Operator, contact, and address MUST be filled in before launch.
+- Service: cyclist mutual-aid Telegram bot `[BOT_USERNAME]`.
+- Minimal data model: Telegram user ID, displayed Telegram data as needed,
+  helper settings, selected areas, request data, exact geo-point explicitly
+  sent for the active request, timestamps and minimal technical logs.
+- Purposes, legal bases, recipients, and retention/deletion conditions MUST be
+  filled in per field; the table in §4 is normative scaffolding.
+- Exact request point MUST NOT be fanned out to all candidates. It is disclosed
+  only to the helper who won the atomic accept, and only as needed to provide
+  help.
+- Subject rights (access, correction, consent withdrawal where applicable,
+  cessation/deletion within legal limits) MUST be described with working
+  contact channels.
+- Actual DB/backup scheme and physical location MUST be described; backups
+  inherit the same access/localization/retention rules.

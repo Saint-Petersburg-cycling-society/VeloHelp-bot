@@ -34,12 +34,32 @@ Generic API не должен содержать Bike/Bicycle-specific types.
 
 ## EN
 
-This application exists to force real reusable primitives out of
-`teloxide-ui`: callback dispatch/ACK, per-action policies, external input,
-multi-surface effects, persistence/recovery, cross-view invalidation and
-reusable form/navigation components.
+Bootstrap pin:
 
-The extraction loop is: observe real application pain, implement minimally,
-identify the invariant, implement a clean generic MIT primitive upstream, then
-migrate the AGPL application to it. Generic APIs must not contain bicycle
-domain concepts.
+```text
+https://github.com/Mar2ianen/teloxide-ui
+70da4d21c327d70e18425eb97503e6b97e94a30e
+```
+
+The bot MUST pull only generic mechanics into the library:
+
+1. callback dispatcher + automatic ACK;
+2. per-action actor/stale/TTL policy;
+3. external input events (location/text) that never pretend to be callbacks;
+4. `RenderAt` / `Send` / `Delete` / toast / alert;
+5. persisted/recoverable UI runtime;
+6. invalidation capabilities across multiple `ViewId`;
+7. reusable `MultiSelect`, `Wizard`, `Confirm`, `ActionBar`, `StatusBadge`;
+8. stable icon/custom-emoji component contract.
+
+### Extraction rule
+
+```text
+real pain in bike-aid
+→ minimal app implementation
+→ isolate the generic invariant
+→ clean MIT primitive in teloxide-ui
+→ migrate bike-aid to the primitive
+```
+
+Generic APIs MUST NOT contain Bike/Bicycle-specific types.

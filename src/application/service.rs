@@ -13,6 +13,11 @@ pub enum AppError {
 
 #[async_trait]
 pub trait RequestRepository: Send + Sync {
+    /// Attempts an atomic accept of an open request.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AppError`] when the underlying storage operation fails.
     async fn accept(
         &self,
         request_id: HelpRequestId,
@@ -32,6 +37,11 @@ where
         Self { requests }
     }
 
+    /// Delegates to the repository atomic accept.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AppError`] when the underlying storage operation fails.
     pub async fn accept_request(
         &self,
         request_id: HelpRequestId,

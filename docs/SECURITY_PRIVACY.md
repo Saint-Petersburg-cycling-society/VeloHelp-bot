@@ -27,12 +27,25 @@
 
 ## EN
 
-Threats include exact-location harvesting, malicious accepts, callback replay,
-spam, log/backup leakage and accidental movement-history retention.
+Main threats:
+- exact-coordinate harvesting by an attacker;
+- accept only to obtain location;
+- callback replay/stale action;
+- spam;
+- leakage via logs/backups;
+- accidental accumulation of movement history.
 
-Mitigations include coarse pre-match location, actor-bound short-lived
-capabilities, stale rejection, bounded retention, no continuous tracking,
-minimal logging and SQLite-aware backups.
+Countermeasures:
+- exact point is not included in fan-out;
+- actor-bound short-lived capabilities;
+- stale reject for Accept;
+- rate limits;
+- do not log the full Telegram Update;
+- do not log exact coordinates by default;
+- finite retention;
+- no continuous tracking;
+- backup via the SQLite API, not raw-copy of WAL;
+- backups get the same access/localization/retention rules.
 
-Every new persistent personal-data field requires an explicit purpose,
-legal-basis review, retention period and deletion path.
+Every new persisted personal-data field requires:
+`purpose + legal basis review + retention + deletion path`.

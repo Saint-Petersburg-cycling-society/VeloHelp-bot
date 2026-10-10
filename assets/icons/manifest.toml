@@ -2,11 +2,31 @@ version = 1
 
 # Fill `custom_emoji_id` after the project icon pack is uploaded.
 # Keep semantic IDs stable after public release.
+# Full required set per docs/DESIGN_SYSTEM.md. Sources in `src/*.svg`
+# are still TODO (v0 stub): entries reserve IDs and export paths.
 
 [[icon]]
 id = "nav.home"
 source = "src/nav-home.svg"
 generated = "generated/nav-home.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "nav.back"
+source = "src/nav-back.svg"
+generated = "generated/nav-back.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "nav.next"
+source = "src/nav-next.svg"
+generated = "generated/nav-next.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "nav.settings"
+source = "src/nav-settings.svg"
+generated = "generated/nav-settings.png"
 custom_emoji_id = ""
 
 [[icon]]
@@ -22,13 +42,133 @@ generated = "generated/action-decline.png"
 custom_emoji_id = ""
 
 [[icon]]
-id = "location.point"
-source = "src/location-point.svg"
-generated = "generated/location-point.png"
+id = "action.cancel"
+source = "src/action-cancel.svg"
+generated = "generated/action-cancel.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "action.resolve"
+source = "src/action-resolve.svg"
+generated = "generated/action-resolve.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "action.edit"
+source = "src/action-edit.svg"
+generated = "generated/action-edit.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "action.source"
+source = "src/action-source.svg"
+generated = "generated/action-source.png"
 custom_emoji_id = ""
 
 [[icon]]
 id = "request.help"
 source = "src/request-help.svg"
 generated = "generated/request-help.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "helper.profile"
+source = "src/helper-profile.svg"
+generated = "generated/helper-profile.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "location.point"
+source = "src/location-point.svg"
+generated = "generated/location-point.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "location.area"
+source = "src/location-area.svg"
+generated = "generated/location-area.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "problem.puncture"
+source = "src/problem-puncture.svg"
+generated = "generated/problem-puncture.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "problem.drivetrain"
+source = "src/problem-drivetrain.svg"
+generated = "generated/problem-drivetrain.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "problem.brakes"
+source = "src/problem-brakes.svg"
+generated = "generated/problem-brakes.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "problem.wheel"
+source = "src/problem-wheel.svg"
+generated = "generated/problem-wheel.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "problem.tools"
+source = "src/problem-tools.svg"
+generated = "generated/problem-tools.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "problem.transport"
+source = "src/problem-transport.svg"
+generated = "generated/problem-transport.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "problem.accident"
+source = "src/problem-accident.svg"
+generated = "generated/problem-accident.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "problem.other"
+source = "src/problem-other.svg"
+generated = "generated/problem-other.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "status.open"
+source = "src/status-open.svg"
+generated = "generated/status-open.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "status.matched"
+source = "src/status-matched.svg"
+generated = "generated/status-matched.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "status.resolved"
+source = "src/status-resolved.svg"
+generated = "generated/status-resolved.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "status.expired"
+source = "src/status-expired.svg"
+generated = "generated/status-expired.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "privacy.data"
+source = "src/privacy-data.svg"
+generated = "generated/privacy-data.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "privacy.delete"
+source = "src/privacy-delete.svg"
+generated = "generated/privacy-delete.png"
 custom_emoji_id = ""

@@ -3,7 +3,7 @@
 mod helper;
 mod request;
 
-pub use helper::{HelperProfile, HelpKind};
+pub use helper::{HelpKind, HelperProfile};
 pub use request::{
     AcceptOutcome, GeoPoint, HelpRequest, HelpRequestId, HelpRequestStatus, TelegramUserId,
 };

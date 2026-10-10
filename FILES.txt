@@ -7,6 +7,7 @@ AGENTS.md
 BOOTSTRAP_MANIFEST.json
 COPYRIGHT
 Cargo.toml
+Cargo.lock
 Containerfile
 LICENSE
 NOTICE
@@ -39,6 +40,7 @@ migrations/0002_indexes.sql
 rust-toolchain.toml
 src/application/mod.rs
 src/application/service.rs
+src/config.rs
 src/domain/helper.rs
 src/domain/mod.rs
 src/domain/request.rs

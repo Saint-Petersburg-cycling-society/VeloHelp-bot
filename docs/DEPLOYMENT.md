@@ -155,20 +155,151 @@ TLS root set обновляется вместе с binary/container rebuild, п
 
 ## EN
 
-Production uses a rootless Podman container built in Alpine/musl and executed
-from `FROM scratch`.
+### Runtime contract
 
-The final root filesystem contains the application executable only; writable
-state is a mounted `/data` directory. There is no shell, package manager,
-shared libc, SQLite CLI, CA bundle or general-purpose userspace.
+Production deployment is **rootless Podman** with a multi-stage build:
 
-TLS Mozilla roots are compiled into the executable and passed to reqwest using
-`tls_certs_only`; Teloxide receives that client through `Bot::with_client`.
-SQLx's SQLite feature bundles and statically links SQLite.
+```text
+Alpine + Rust + musl + compiler toolchain    builder only
+                    ↓
+             static-ish musl ELF
+                    ↓
+                FROM scratch                 runtime
+                    ↓
+          /bike-aid + mounted /data
+```
 
-The runtime baseline is rootless Podman, numeric non-root user, read-only
-rootfs, all capabilities dropped, no-new-privileges, no published ports and a
-single writable data mount.
+The final image contains no shell, package manager, libc shared objects,
+coreutils, sqlite CLI, CA bundle, or `/etc/passwd`.
+
+There is a single executable. TLS roots are compiled into the binary via
+`webpki-root-certs`. `teloxide::Bot` receives a custom `reqwest::Client`
+through `Bot::with_client`.
+
+SQLite is bundled/static via SQLx `sqlite`, so no system `libsqlite3`
+runtime is required.
+
+### Why not an Alpine runtime
+
+Alpine is builder-only. Keeping it as a final layer would add
+apk/busybox/musl userspace that the application never uses.
+
+`scratch` reduces the runtime attack surface and removes the vulnerability
+class in unused userspace packages.
+
+This is not an “OS-less VM”: the container still uses the host kernel.
+Isolation comes from rootless Podman, user namespaces, OCI
+namespaces/seccomp/cgroups, and container config limits.
+
+### Build
+
+On an ARM64 host:
+
+```sh
+podman build -f Containerfile -t localhost/bike-aid:latest .
+```
+
+The Alpine builder produces a native `aarch64-unknown-linux-musl` binary;
+on x86_64 it produces `x86_64-unknown-linux-musl`.
+
+For releases, once `Cargo.lock` exists, the build MUST use
+`cargo build --release --locked`.
+
+### Runtime hardening
+
+Baseline:
+
+```text
+rootless Podman
+FROM scratch
+USER 65532:65532
+read-only rootfs
+drop ALL capabilities
+no-new-privileges
+no published ports
+only /data writable
+```
+
+Long polling requires only outbound HTTPS; no inbound port is needed.
+
+### Raw run
+
+```sh
+mkdir -p ~/.config/bike-aid ~/.local/share/bike-aid
+cp .env.example ~/.config/bike-aid/bike-aid.env
+$EDITOR ~/.config/bike-aid/bike-aid.env
+
+podman run \
+  --rm \
+  --name bike-aid \
+  --read-only \
+  --cap-drop=all \
+  --security-opt=no-new-privileges \
+  --user 65532:65532 \
+  --userns=keep-id:uid=65532,gid=65532 \
+  --env-file ~/.config/bike-aid/bike-aid.env \
+  --volume ~/.local/share/bike-aid:/data:Z \
+  localhost/bike-aid:latest
+```
+
+### Quadlet
+
+On a systemd host the rootless Quadlet is placed at:
+
+```text
+~/.config/containers/systemd/bike-aid.container
+```
+
+Then:
+
+```sh
+systemctl --user daemon-reload
+systemctl --user enable --now bike-aid.service
+```
+
+Linger is normally enabled for a dedicated service account so the service
+starts without a user login session.
+
+On OpenWrt/systemd-less hosts the container is started/restarted by the host
+init system via the Podman CLI; the application binary MUST NOT be installed
+directly on the host rootfs.
+
+### SQLite
+
+Live database:
+
+```text
+/data/bike-aid.sqlite
+```
+
+Only `/data` is writable to the container.
+
+SQLite:
+- WAL;
+- synchronous FULL;
+- foreign keys ON;
+- busy timeout 5s;
+- one connection in the MVP.
+
+### Backup
+
+Do not bring `sqlite3` into the container. It is a host-side maintenance tool.
+
+Never raw-copy an open WAL DB. Use the online backup API / `.backup`.
+
+### Updates
+
+```text
+git pull
+→ podman build new immutable image
+→ run tests/smoke
+→ replace container
+```
+
+There is no `apk upgrade` inside the production image.
+
+The TLS root set is updated together with the binary/container rebuild,
+because `webpki-root-certs` is compiled in.
 
 Containers still use the host kernel; `scratch` removes image userspace rather
 than removing the operating system kernel.

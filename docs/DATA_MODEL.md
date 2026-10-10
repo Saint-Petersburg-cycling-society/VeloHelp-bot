@@ -39,13 +39,37 @@ DB должна обеспечивать как минимум:
 
 ## EN
 
-Telegram user ID is the stable external identity; username/display name are
-presentation only.
+### Identity
 
-The main tables are users, helper profiles, areas, availability, requests,
-problem tags and per-helper dispatches. UUIDs are stored as canonical text at
-the SQLite boundary and timestamps as UTC Unix seconds.
+The stable external identity is the Telegram user ID (`INTEGER`/`i64`).
+`username` and display name are presentation only.
 
-Exact coordinates are purpose-limited and must be removed according to the
-retention policy. The schema enforces status/FK/range and basic match
-invariants.
+### Main tables
+
+- `users` — minimal identity + consent metadata;
+- `helper_profiles` — helper settings;
+- `areas` — data-driven territory hierarchy;
+- `helper_areas`, `helper_help_kinds` — matching preferences;
+- `availability_windows` — optional schedule;
+- `help_requests` — authoritative request state;
+- `request_problem_tags` — structured traits;
+- `dispatches` — fan-out and per-helper notification state.
+
+UUIDs in SQLite are stored as canonical text at the storage boundary.
+
+Time is stored as Unix seconds (`INTEGER`) in UTC.
+
+### Exact location
+
+Exact coordinates are purpose-limited. After the request is closed they MUST be
+cleared per the retention policy. No user movement history is created.
+
+### Constraints
+
+The DB MUST enforce at least:
+- allowed enum-like status values via `CHECK`;
+- FK;
+- impossibility of `matched_helper_id == requester_id`;
+- `matched` requires a helper;
+- valid lat/lon;
+- `expires_at > created_at`.
