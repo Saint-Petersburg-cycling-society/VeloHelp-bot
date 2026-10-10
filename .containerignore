@@ -1,0 +1,16 @@
+.git
+.github
+target
+.env
+.env.*
+docs
+assets
+deploy
+tests
+README.md
+AGENTS.md
+LICENSE
+NOTICE
+COPYRIGHT
+SHA256SUMS
+FILES.txt

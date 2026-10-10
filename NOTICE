@@ -1,0 +1,8 @@
+bike-aid — Telegram mutual-aid service for cyclists
+
+Copyright (C) 2026 Михаил Чечулин
+
+SPDX-License-Identifier: AGPL-3.0-only
+
+The application depends on teloxide-ui, a separate MIT-licensed project:
+https://github.com/Mar2ianen/teloxide-ui

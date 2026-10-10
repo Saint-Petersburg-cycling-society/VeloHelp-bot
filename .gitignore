@@ -1,0 +1,10 @@
+/target
+.env
+.env.*
+!.env.example
+*.swp
+*.swo
+.DS_Store
+.idea/
+.vscode/
+coverage/

@@ -1,0 +1,48 @@
+{
+  "generated_at": "2026-10-03",
+  "project_license": "AGPL-3.0-only",
+  "teloxide_ui": {
+    "repo": "https://github.com/Mar2ianen/teloxide-ui",
+    "rev": "70da4d21c327d70e18425eb97503e6b97e94a30e",
+    "license": "MIT"
+  },
+  "teloxide_fork": {
+    "repo": "https://github.com/Mar2ianen/teloxide-fork",
+    "rev": "a6092220"
+  },
+  "telegram_bot_api": "10.3",
+  "storage": {
+    "engine": "SQLite",
+    "journal_mode": "WAL",
+    "synchronous": "FULL",
+    "pool_max_connections": 1,
+    "decision_adr": "docs/adr/0003-sqlite-for-single-host-mvp.md"
+  },
+  "deployment": [
+    "systemd",
+    "OpenWrt/procd"
+  ],
+  "organization_context": {
+    "name": "АНО «Петербургское велообщество»",
+    "ogrn": "1227800043327",
+    "inn": "7811773910",
+    "director": "Павел Михайлович Хусу"
+  },
+  "docs_languages": [
+    "ru",
+    "en"
+  ],
+  "runtime": {
+    "builder": "rust:1.88-alpine + musl",
+    "final_image": "scratch",
+    "container_engine": "rootless Podman",
+    "uid_gid": "65532:65532",
+    "rootfs": "read-only",
+    "writable_mounts": [
+      "/data"
+    ],
+    "capabilities": "drop all",
+    "no_new_privileges": true,
+    "tls_roots": "compiled webpki-root-certs"
+  }
+}

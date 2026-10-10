@@ -1,0 +1,34 @@
+version = 1
+
+# Fill `custom_emoji_id` after the project icon pack is uploaded.
+# Keep semantic IDs stable after public release.
+
+[[icon]]
+id = "nav.home"
+source = "src/nav-home.svg"
+generated = "generated/nav-home.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "action.accept"
+source = "src/action-accept.svg"
+generated = "generated/action-accept.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "action.decline"
+source = "src/action-decline.svg"
+generated = "generated/action-decline.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "location.point"
+source = "src/location-point.svg"
+generated = "generated/location-point.png"
+custom_emoji_id = ""
+
+[[icon]]
+id = "request.help"
+source = "src/request-help.svg"
+generated = "generated/request-help.png"
+custom_emoji_id = ""

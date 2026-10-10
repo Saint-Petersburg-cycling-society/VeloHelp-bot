@@ -1,0 +1,33 @@
+# Rootless Podman Quadlet.
+# Install under ~/.config/containers/systemd/bike-aid.container
+
+[Unit]
+Description=bike-aid Telegram bot
+
+[Container]
+Image=localhost/bike-aid:latest
+ContainerName=bike-aid
+EnvironmentFile=%h/.config/bike-aid/bike-aid.env
+
+# The process is already non-root inside the image.
+User=65532
+Group=65532
+
+# Map the invoking rootless Podman user to the container's numeric runtime UID,
+# so the bind-mounted SQLite directory remains writable without container root.
+UserNS=keep-id:uid=65532,gid=65532
+
+Volume=%h/.local/share/bike-aid:/data:Z
+
+ReadOnly=true
+NoNewPrivileges=true
+DropCapability=all
+
+# Long polling requires outbound network only. No host ports are published.
+
+[Service]
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
