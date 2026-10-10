@@ -142,6 +142,27 @@ pub fn status_text(status: HelpRequestStatus) -> &'static str {
     }
 }
 
+/// Source/legal view: visible Corresponding Source path (AGPL).
+#[must_use]
+pub fn source_view(source_url: &str) -> Ui<Action> {
+    Ui::column()
+        .push(Ui::heading("Source code"))
+        .push(Ui::paragraph(format!("Corresponding Source: {source_url}")))
+        .push(button_row(Action::OpenSource))
+}
+
+/// Privacy view: minimal data summary + deletion path pointer.
+#[must_use]
+pub fn privacy_view(consent_version: &str) -> Ui<Action> {
+    Ui::column()
+        .push(Ui::heading("My data"))
+        .push(Ui::paragraph(format!("Consent version: {consent_version}")))
+        .push(Ui::paragraph(
+            "We store Telegram ID, helper settings, coarse areas, requests and the exact point of the active request only.",
+        ))
+        .push(button_row(Action::OpenHelperSettings))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

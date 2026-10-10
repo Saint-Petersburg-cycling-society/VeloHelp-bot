@@ -139,6 +139,10 @@ SQLite:
 
 Нельзя raw-copy открытый WAL DB. Использовать online backup API / `.backup`.
 
+Таймер: `deploy/systemd/bike-aid-backup.service` + `bike-aid-backup.timer`
+(daily, `Persistent=true`). Restore проверяется `tests/backup_restore.rs`
+(`VACUUM INTO` + `PRAGMA integrity_check` + row count).
+
 ### Updates
 
 ```text
@@ -286,6 +290,10 @@ SQLite:
 Do not bring `sqlite3` into the container. It is a host-side maintenance tool.
 
 Never raw-copy an open WAL DB. Use the online backup API / `.backup`.
+
+Timer: `deploy/systemd/bike-aid-backup.service` + `bike-aid-backup.timer`
+(daily, `Persistent=true`). Restore is covered by `tests/backup_restore.rs`
+(`VACUUM INTO` + `PRAGMA integrity_check` + row count).
 
 ### Updates
 

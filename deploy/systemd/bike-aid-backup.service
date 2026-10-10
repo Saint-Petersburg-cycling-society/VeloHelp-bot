@@ -1,0 +1,14 @@
+[Unit]
+Description=bike-aid SQLite online backup
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+# Host-side maintenance tool. Never runs inside the scratch container.
+ExecStart=%h/.local/bin/bike-aid-backup.sh
+Nice=10
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

@@ -8,16 +8,22 @@
 use crate::domain::HelpRequestId;
 
 pub mod components;
+pub mod dispatcher;
+pub mod effects;
+pub mod persistence;
 pub mod policy;
 pub mod session;
 pub mod views;
 
 pub use components::{Confirm, MultiSelect, StatusBadge, Wizard};
+pub use dispatcher::{ack_for_error, dispatch_callback, register_action, Ack, DispatchOutcome};
+pub use effects::{render_is_fresh, reproject_request, ProjectionTarget};
+pub use persistence::{SnapshotStore, ViewSnapshot};
 pub use policy::{action_ttl, actor_policy, stale_policy};
 pub use session::{HelperDraft, RequestDraft, RequestStep};
 pub use views::{
     action_label, dispatch_card_view, helper_setup_view, home_view, icon_id, matched_helper_view,
-    matched_requester_view, status_text,
+    matched_requester_view, privacy_view, source_view, status_text,
 };
 
 /// Typed UI actions. Generic mechanics only; no `Bike*` component names and

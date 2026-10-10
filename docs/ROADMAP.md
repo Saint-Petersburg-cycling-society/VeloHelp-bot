@@ -24,31 +24,31 @@
 - [x] concurrent accept integration test
 
 ### Phase 2 — frontend
-- [ ] `/start`
-- [ ] consent/legal
-- [ ] reusable MultiSelect/Wizard/Confirm
-- [ ] location external input
-- [ ] dispatch cards
-- [ ] matched surfaces
-- [ ] custom icon pack v1
+- [x] `/start`
+- [x] consent/legal
+- [x] reusable MultiSelect/Wizard/Confirm
+- [x] location external input
+- [x] dispatch cards
+- [x] matched surfaces
+- [x] custom icon pack v1
 
 ### Phase 3 — upstream teloxide-ui
-- [ ] callback dispatcher + ACK
-- [ ] per-action policy
-- [ ] external input primitive
-- [ ] multi-surface effect executor
-- [ ] persistence/recovery
-- [ ] cross-view invalidation
-- [ ] reusable components
+- [x] callback dispatcher + ACK
+- [x] per-action policy
+- [x] external input primitive
+- [x] multi-surface effect executor
+- [x] persistence/recovery
+- [x] cross-view invalidation
+- [x] reusable components
 
 ### Phase 4 — operations
-- [ ] TTL worker
-- [ ] rate limits
-- [ ] metrics
-- [ ] backup timer + restore test
-- [ ] deletion/export
-- [ ] source/legal UI
-- [ ] deployment hardening
+- [x] TTL worker
+- [x] rate limits
+- [x] metrics
+- [x] backup timer + restore test
+- [x] deletion/export
+- [x] source/legal UI
+- [x] deployment hardening
 
 ## EN
 
@@ -74,28 +74,28 @@
 - [x] concurrent accept integration test
 
 ### Phase 2 — frontend
-- [ ] `/start`
-- [ ] consent/legal
-- [ ] reusable MultiSelect/Wizard/Confirm
-- [ ] location external input
-- [ ] dispatch cards
-- [ ] matched surfaces
-- [ ] custom icon pack v1
+- [x] `/start`
+- [x] consent/legal
+- [x] reusable MultiSelect/Wizard/Confirm
+- [x] location external input
+- [x] dispatch cards
+- [x] matched surfaces
+- [x] custom icon pack v1
 
 ### Phase 3 — upstream teloxide-ui
-- [ ] callback dispatcher + ACK
-- [ ] per-action policy
-- [ ] external input primitive
-- [ ] multi-surface effect executor
-- [ ] persistence/recovery
-- [ ] cross-view invalidation
-- [ ] reusable components
+- [x] callback dispatcher + ACK
+- [x] per-action policy
+- [x] external input primitive
+- [x] multi-surface effect executor
+- [x] persistence/recovery
+- [x] cross-view invalidation
+- [x] reusable components
 
 ### Phase 4 — operations
-- [ ] TTL worker
-- [ ] rate limits
-- [ ] metrics
-- [ ] backup timer + restore test
-- [ ] deletion/export
-- [ ] source/legal UI
-- [ ] deployment hardening
+- [x] TTL worker
+- [x] rate limits
+- [x] metrics
+- [x] backup timer + restore test
+- [x] deletion/export
+- [x] source/legal UI
+- [x] deployment hardening
