@@ -64,7 +64,16 @@ consent screen или любых записей в БД. Числовые ID о�
 Адрес определяется только локально по встроенным адресам и улицам OSM.
 Точка не передаётся внешнему геокодеру. Предпросмотр видит только requester;
 после приёма карту, адрес и имя-ссылку получают только участники пары. Домовой
-центр приблизительный: подпись «Рядом» ограничена 60 м, улица — 80 м.
+номер показывается только при однозначном контуре/адресной точке до 20 м;
+улица — до 80 м. GPS-радиус больше 25 м или конкурирующие дома убирают номер.
+GPS quality остаётся в сессии до TTL и не сохраняется в БД.
+Ручной `exact_address` нужен для координации: requester явно вводит его,
+видит в preview и экспортирует со своей заявкой. Адрес не попадает в fan-out,
+логи или экспорт помощника; виден только текущей паре. SQL trigger очищает его
+при закрытии или удалении точки. Фильтры `helper_problem_tags` нужны для выбора
+подходящих уведомлений; хранятся с профилем до изменения/удаления аккаунта.
+Диагностика пишет только фиксированное имя операции и категорию ошибки;
+URL, сырой ответ Telegram, описание, адрес, ID и координаты не логируются.
 
 Новое сохраняемое поле — границы заявленного времени прибытия. Purpose:
 координация помощи; пользователь явно выбирает время при приёме, а экран
@@ -149,7 +158,16 @@ or copies already saved elsewhere.
 Address lookup runs entirely locally against embedded OSM houses and streets.
 No point goes to a remote geocoder. Only the requester sees preview; after matching,
 only pair members receive the map, address and profile link. House centers are
-approximate: “Рядом” is bounded to 60 m for houses and 80 m for streets.
+approximate: house numbers require an unambiguous outline/address node within
+20 m; streets are bounded to 80 m. GPS radii over 25 m or competing buildings
+suppress house numbers. GPS quality stays in the session until TTL and never in DB.
+Manual `exact_address` coordinates assistance: the requester explicitly enters it,
+reviews it and exports it with their own requests. It never enters fan-out, logs
+or helper exports; only current pair members see it. A SQL trigger clears it
+on closure or point removal. `helper_problem_tags` filter relevant notifications
+and remain with the profile until changed or the account is deleted.
+Diagnostics log only fixed operation/error categories, never URLs, raw Telegram
+responses, descriptions, addresses, IDs or coordinates.
 
 The new persisted personal fields are declared arrival-time bounds. Purpose:
 coordinate assistance; users explicitly select an estimate on acceptance and the

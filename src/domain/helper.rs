@@ -4,6 +4,29 @@ use serde::{Deserialize, Serialize};
 
 use super::TelegramUserId;
 
+/// Stable problem catalog shared by matching and the two setup screens.
+pub const HELP_PROBLEMS: &[&str] = &[
+    "puncture",
+    "drivetrain",
+    "brakes",
+    "wheel",
+    "tools",
+    "transport",
+    "accident",
+];
+
+/// Maps a known problem to its help kind.
+#[must_use]
+pub fn problem_kind(tag: &str) -> Option<HelpKind> {
+    HELP_PROBLEMS
+        .contains(&tag)
+        .then_some(if tag == "accident" {
+            HelpKind::Accident
+        } else {
+            HelpKind::Technical
+        })
+}
+
 /// Kind of help, stored as `technical`/`accident` in `SQLite`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -59,6 +82,9 @@ pub struct HelperProfile {
     pub enabled: bool,
     pub areas: Vec<String>,
     pub help_kinds: Vec<HelpKind>,
+    /// Empty means all problems of supported kinds, preserving older profiles.
+    #[serde(default)]
+    pub problem_tags: Vec<String>,
 }
 
 impl HelperProfile {

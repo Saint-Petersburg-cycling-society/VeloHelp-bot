@@ -203,6 +203,7 @@ migrations/0002_indexes.sql
 migrations/0003_dispatch_versions.sql
 migrations/0004_spb_areas.sql
 migrations/0005_arrival_window.sql
+migrations/0006_helper_problems_and_address.sql
 rust-toolchain.toml
 src/application/mod.rs
 src/application/service.rs

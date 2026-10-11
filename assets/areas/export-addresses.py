@@ -9,6 +9,7 @@ class AddressData(osmium.SimpleHandler):
     def __init__(self):
         super().__init__()
         self.houses = set()
+        self.buildings = []
         self.roads = []
     def add_address(self, tags, points):
         street = tags.get('addr:street') or tags.get('addr:place')
@@ -27,8 +28,14 @@ class AddressData(osmium.SimpleHandler):
                 self.roads.append([way.tags['name'],points])
     def area(self, area):
         if (area.tags.get('addr:street') or area.tags.get('addr:place')) and area.tags.get('addr:housenumber'):
-            points = [(n.lon,n.lat) for ring in area.outer_rings() for n in ring if n.location.valid()]
-            self.add_address(area.tags, points)
+            street = area.tags.get('addr:street') or area.tags.get('addr:place')
+            number = area.tags['addr:housenumber']
+            for outer in area.outer_rings():
+                points = [[round(n.lon,7),round(n.lat,7)] for n in outer if n.location.valid()]
+                holes = [[[round(n.lon,7),round(n.lat,7)] for n in inner if n.location.valid()] for inner in area.inner_rings(outer)]
+                if len(points) >= 4 and points[0] == points[-1]:
+                    assert all(len(r) >= 4 and r[0] == r[-1] for r in holes)
+                    self.buildings.append([street,number,points,holes])
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -36,12 +43,12 @@ def main():
     args = parser.parse_args()
     data = AddressData()
     data.apply_file(args.pbf, locations=True, idx='flex_mem')
-    assert data.houses and data.roads
+    assert data.houses and data.buildings and data.roads
     header = osmium.io.Reader(str(args.pbf)).header()
-    output = {'license':'ODbL-1.0','attribution':'© OpenStreetMap contributors','source':'https://download.openstreetmap.fr/extracts/russia/northwestern_federal_district/saint_petersburg.osm.pbf','osm_timestamp':header.get('osmosis_replication_timestamp'), 'pbf_sha256':hashlib.sha256(args.pbf.read_bytes()).hexdigest(), 'houses':sorted(data.houses), 'roads':sorted(data.roads)}
+    output = {'license':'ODbL-1.0','attribution':'© OpenStreetMap contributors','source':'https://download.openstreetmap.fr/extracts/russia/northwestern_federal_district/saint_petersburg.osm.pbf','osm_timestamp':header.get('osmosis_replication_timestamp'), 'pbf_sha256':hashlib.sha256(args.pbf.read_bytes()).hexdigest(), 'houses':sorted(data.houses), 'buildings':sorted(data.buildings), 'roads':sorted(data.roads)}
     target = Path(__file__).with_name('spb-addresses.json')
     target.write_text(json.dumps(output,ensure_ascii=False,separators=(',',':'))+'\n')
-    print(f'Prepared {len(data.houses)} address points and {len(data.roads)} named road geometries.')
+    print(f'Prepared {len(data.houses)} address nodes, {len(data.buildings)} building outlines and {len(data.roads)} named road geometries.')
 
 if __name__ == '__main__':
     main()

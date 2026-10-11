@@ -20,12 +20,13 @@ Telegram-бот добровольной взаимопомощи велосип
 Telegram представляет состояние и передаёт команды через привязанные к пользователю capabilities.
 
 После `/start` и явного согласия доступны два независимых сценария: настройка
-помощника и заявка. Заявка: одна кнопка проблемы или свой текст → геопозиция
+помощника и заявка. Заявка: одна кнопка проблемы или свой текст → геопозиция или адрес
 → предпросмотр и публикация → рассылка → атомарный приём → закрытие/отказ помощника. Есть `/active`, `/source`,
 экспорт JSON и подтверждаемое удаление данных. Только личные чаты.
 Район заявки определяется локально по границам OSM, без внешнего геокодера.
 Все 18 кнопок районов находятся на одном экране, без страниц.
-Тип помощи и пауза уведомлений доступны отдельно в «Настройки».
+Типы помощи, отдельные проблемы и пауза уведомлений доступны рядом с районами;
+после сохранения главная подтверждает регистрацию помощника.
 `/start` открывает новое главное сообщение, сохраняя временный выбор районов;
 кнопки редактируют экран, в котором нажаты.
 Точные координаты автоматически не входят в рассылку и удаляются из БД при закрытии.
@@ -150,12 +151,13 @@ AGPL-3.0-only; `teloxide-ui` remains a separate MIT dependency. SQLite determine
 the winner; Telegram presents state and invokes actor-bound capabilities.
 
 After `/start` and explicit consent, users can independently configure help or
-request it. A request takes one problem button or free text → explicit location
+request it. A request takes one problem button or free text → location point or address
 → preview and publish → fan-out → atomic accept → resolve/withdraw. `/active`, `/source`, JSON
 export and confirmed data deletion are available. Private chats only.
 Request districts are resolved locally from OSM boundaries without a remote
 geocoder. District selection shows all 18 buttons on one screen, without pagination.
-Help types and notification pause are in a separate Settings screen.
+Help kinds, individual problems and notification pause appear alongside districts;
+Home confirms registration after saving.
 `/start` opens a new home message while retaining temporary district selections;
 buttons edit the message in which they are pressed.
 Exact coordinates are excluded from automatic fan-out and cleared on closure.
@@ -269,3 +271,17 @@ Helper invitations include the district and a map of an approximate 1 × 1 km zo
 The marker is the zone center, not a meeting place. Selecting an estimate and accepting
 updates the same card with the exact point and address. Repeated sends use the same
 center without random jitter. Requester preview explains this disclosure before publication.
+
+## Обновление 11.10.2026 / Update 2026-10-11
+
+RU: в настройках помощника видны все районы, отдельные проблемы и уведомления;
+сохранение подтверждается на главной. Место заявки можно задать геопозицией или
+адресом (например, «Дачный 17к3»), а затем уточнить подпись вручную. Адрес и точная
+точка доступны только текущей паре; закрытие очищает оба поля. При неточном GPS
+бот не угадывает номер дома. Карточки помощника содержат возврат на главную.
+
+EN: helper setup shows all districts, individual problems and notifications;
+Home confirms saved registration. Requests accept location or a local address
+(e.g. “Дачный 17к3”), followed by optional manual label correction. Only the
+current pair sees the address/exact point; closure clears both. Uncertain GPS
+suppresses house numbers. Helper cards offer Home navigation.

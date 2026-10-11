@@ -123,7 +123,12 @@ impl DistrictMap {
     }
 }
 
-fn segment_distance(point: GeoPoint, edge: &[[f64; 2]], lon_scale: f64, lat_scale: f64) -> f64 {
+pub(super) fn segment_distance(
+    point: GeoPoint,
+    edge: &[[f64; 2]],
+    lon_scale: f64,
+    lat_scale: f64,
+) -> f64 {
     let ax = (edge[0][0] - point.lon) * lon_scale;
     let ay = (edge[0][1] - point.lat) * lat_scale;
     let dx = (edge[1][0] - edge[0][0]) * lon_scale;
@@ -137,7 +142,7 @@ fn segment_distance(point: GeoPoint, edge: &[[f64; 2]], lon_scale: f64, lat_scal
     (ax + t * dx).hypot(ay + t * dy)
 }
 
-fn contains(ring: &[[f64; 2]], point: GeoPoint) -> bool {
+pub(super) fn contains(ring: &[[f64; 2]], point: GeoPoint) -> bool {
     let (x, y) = (point.lon, point.lat);
     let mut inside = false;
     for edge in ring.windows(2) {

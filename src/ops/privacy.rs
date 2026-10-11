@@ -17,9 +17,9 @@ use crate::{application::AppError, domain::TelegramUserId};
 /// Returns [`AppError`] when storage fails.
 pub async fn scorch_exact_points(pool: &SqlitePool) -> Result<u64, AppError> {
     let rows = sqlx::query(
-        "UPDATE help_requests SET exact_lat=NULL, exact_lon=NULL, arrival_from_at=NULL, arrival_until_at=NULL
+        "UPDATE help_requests SET exact_lat=NULL, exact_lon=NULL, exact_address=NULL, arrival_from_at=NULL, arrival_until_at=NULL
          WHERE status IN ('resolved','cancelled','expired')
-           AND (exact_lat IS NOT NULL OR exact_lon IS NOT NULL OR arrival_from_at IS NOT NULL OR arrival_until_at IS NOT NULL)",
+           AND (exact_lat IS NOT NULL OR exact_lon IS NOT NULL OR exact_address IS NOT NULL OR arrival_from_at IS NOT NULL OR arrival_until_at IS NOT NULL)",
     )
     .execute(pool)
     .await
@@ -77,6 +77,7 @@ pub async fn export_user_json(
         ("helper_profile", "SELECT * FROM helper_profiles WHERE user_id=?"),
         ("areas", "SELECT * FROM helper_areas WHERE user_id=?"),
         ("help_kinds", "SELECT * FROM helper_help_kinds WHERE user_id=?"),
+        ("helper_problem_tags", "SELECT * FROM helper_problem_tags WHERE user_id=?"),
         ("availability", "SELECT * FROM availability_windows WHERE user_id=?"),
         ("requests", "SELECT * FROM help_requests WHERE requester_id=?"),
         ("problem_tags", "SELECT t.* FROM request_problem_tags t JOIN help_requests r ON r.id=t.request_id WHERE r.requester_id=?"),

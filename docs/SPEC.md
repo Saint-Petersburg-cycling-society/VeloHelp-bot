@@ -51,8 +51,8 @@ Frontend не решает бизнес-состояние. Backend не зна�
 
 ```text
 problem button OR free-text description
-→ explicit location (automatic local district lookup)
-→ preview
+→ location point OR local address search (automatic district lookup)
+→ preview (optional manual address correction)
 → publish
 ```
 
@@ -133,15 +133,25 @@ capabilities Open-заявок — оставшийся TTL заявки; perman
 Проверки отсутствующего района и типа дают разные сообщения; техническая помощь
 выбрана по умолчанию. Каждый район использует свою `area.*` custom emoji.
 
-Основной экран помощника: одна строка счётчика, все 18 кнопок районов в две
-колонки на одном экране, затем «Сохранить / Главная / Настройки». Пагинации нет.
-Тип помощи и переключатель уведомлений находятся в отдельном экране
-«Настройки»; возврат к районам сохраняет выбор.
-«Сохранить» отключено, пока включённому помощнику не выбран район или тип.
-Возврат на главную и `/start` сохраняют временный черновик помощника до TTL.
-`/start` обновляет текущее главное сообщение; кнопки прежней revision
-инвалидируются. Новый экран создаётся только при отсутствии/недоступности старого
-сообщения, а прежний по возможности удаляется.
+Экран помощника показывает все 18 районов, шесть технических проблем, происшествие,
+выбор всех поломок и переключатель уведомлений. «Сохранить» отключено, пока
+включённому помощнику не выбраны район и проблема. После записи в БД тот же
+экран становится главной с подтверждением сохранения и статусом регистрации.
+Черновик после сохранения сбрасывается; повторное открытие читает профиль из БД.
+Главная и `/start` сохраняют несохранённый черновик до TTL. Кнопки редактируют
+сообщение, на котором нажаты; команды создают новый экран внизу чата.
+Карточки помощника, включая отменённые и истёкшие, содержат «Главная».
+
+На шаге Location можно отправить точку или написать улицу, дом и корпус.
+Локальный поиск автоматически выбирает единственный адрес; при неоднозначности
+показывает до шести вариантов. Точка адреса находится внутри публичного контура
+здания и может отличаться от входа; preview предупреждает об этом. «Уточнить адрес»
+открывает шаг Address: текст до 200 символов исправляет подпись, сохраняя точку.
+Возврат отменяет только ввод, а не ранее сохранённый адрес. Новая геоточка
+сбрасывает адрес и варианты прежнего поиска. Старые callback выбора адреса отклоняются.
+Ошибку карточки после commit публикации бот объясняет явно: заявка уже опубликована,
+её можно открыть через `/active`; повторная отправка не создаёт дубликат.
+
 Заголовки экранов выводятся обычным текстом без крупного Rich Heading.
 
 ### Карта и время прибытия
@@ -261,8 +271,8 @@ Territories are data-driven `AreaId`, without a home address.
 
 ```text
 problem button OR free-text description
-→ explicit location (automatic local district lookup)
-→ preview
+→ location point OR local address search (automatic district lookup)
+→ preview (optional manual address correction)
 → publish
 ```
 
@@ -342,15 +352,23 @@ Helper district selections survive visits to settings and help-type validation e
 Missing areas and missing help types have distinct messages; technical help is
 selected by default. Each district uses its own `area.*` custom emoji.
 
-The helper's main screen has one counter line, all 18 district buttons in two
-columns on one screen, then Save / Home / Settings. There is no pagination.
-Help types and the notification toggle are on a separate Settings screen;
-returning to districts preserves selections.
-Save is disabled while an enabled helper has no area or help type selected.
-Home and `/start` preserve the temporary helper draft until its TTL expires.
-`/start` updates the current primary message and invalidates the previous
-revision’s capabilities. A new surface is created only when the old message is
-missing or uneditable; the old message is deleted when possible.
+Helper setup displays all 18 districts, six technical problems, accidents, an
+all-technical toggle and notifications. Save is disabled until an enabled helper
+selects an area and a problem. After the DB write, the same message becomes Home
+with a save confirmation and registration status. Saving clears the temporary
+draft; reopening reads the DB profile. Home and `/start` preserve unsaved drafts
+until their TTL. Buttons edit their message; commands create a fresh bottom screen.
+Helper cards, including cancelled and expired requests, offer Home navigation.
+
+Location accepts a point or a street, house and corpus. Local search advances a
+unique address automatically, or shows up to six choices. The building point lies
+inside a public outline and may differ from the entrance; preview explains this.
+Edit Address opens Address: up to 200 characters change the label and keep the
+point. Back cancels input without clearing the previous address. A new location
+clears the old manual label and search choices. Stale address callbacks are rejected.
+If projection fails after publication commits, the bot explicitly confirms that
+the request exists and can be opened with `/active`; replay cannot duplicate it.
+
 Screen titles use ordinary text rather than oversized Rich Heading blocks.
 
 ### Map and arrival estimate
@@ -416,3 +434,21 @@ replaces the winner’s map with the exact one in the same message and removes m
 from losing helpers’ refreshed cards. Closure/TTL remove maps. Foreign actors cannot
 open invitations through callbacks or OpenRequest. Consent and requester preview
 explain disclosure; no extra steps or buttons are introduced.
+
+## Изменения 2026-10-11 / Changes 2026-10-11
+
+RU: помощник выбирает конкретные проблемы из того же каталога, что requester.
+Районы, проблемы и уведомления доступны на одном экране; сохранение подтверждается
+статусом регистрации на главной. Старые профили сохраняют подписки на весь тип.
+На шаге места разрешён локальный поиск по адресу; перед публикацией ручная подпись
+до 200 символов уточняет адрес без перемещения точки. Адрес приватен до match и
+удаляется вместе с точкой. При сбое карточки после commit подтверждается уже
+созданная заявка. Диагностика содержит только операции и категории ошибок.
+
+EN: helpers select specific problems from the requester's catalog. Districts,
+problems and notifications share one screen; Home confirms saved registration.
+Legacy profiles retain whole-kind subscriptions. Location allows local address
+search; before publication, a manual label of up to 200 characters corrects the
+address without moving the point. Addresses remain private until matching and
+are cleared with the point. Projection failures after commit confirm the request
+already exists. Diagnostics contain only operation/error categories.

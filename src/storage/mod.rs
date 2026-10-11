@@ -82,6 +82,17 @@ impl RequestRepository for SqliteRepositories {
             || request
                 .exact_point
                 .is_some_and(|p| crate::domain::GeoPoint::new(p.lat, p.lon).is_none())
+            || request.exact_address.as_ref().is_some_and(|address| {
+                address.trim().is_empty()
+                    || address.chars().count() > 200
+                    || request.exact_point.is_none()
+                    || matches!(
+                        request.status,
+                        HelpRequestStatus::Cancelled
+                            | HelpRequestStatus::Resolved
+                            | HelpRequestStatus::Expired
+                    )
+            })
         {
             return Err(AppError::InvalidInput(
                 "invalid request fields or expiry".to_owned(),
@@ -100,8 +111,8 @@ impl RequestRepository for SqliteRepositories {
             "INSERT INTO help_requests
              (id, requester_id, help_kind, description, bike_description,
               exact_lat, exact_lon, area_id, status, matched_helper_id,
-              version, expires_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+              version, expires_at, exact_address)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(id.clone())
         .bind(request.requester_id.0)
@@ -115,6 +126,7 @@ impl RequestRepository for SqliteRepositories {
         .bind(request.matched_helper_id.map(|id| id.0))
         .bind(i64::try_from(request.version).map_err(|e| AppError::Storage(e.to_string()))?)
         .bind(expires_at)
+        .bind(request.exact_address.as_deref())
         .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
@@ -407,6 +419,13 @@ impl HelperRepository for SqliteRepositories {
     }
 
     async fn upsert_helper(&self, profile: &HelperProfile) -> Result<(), AppError> {
+        if profile.problem_tags.iter().any(|tag| {
+            crate::domain::problem_kind(tag).is_none_or(|kind| !profile.help_kinds.contains(&kind))
+        }) {
+            return Err(AppError::InvalidInput(
+                "invalid helper problem preferences".into(),
+            ));
+        }
         let now = chrono::Utc::now().timestamp();
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
         sqlx::query(
@@ -455,6 +474,17 @@ impl HelperRepository for SqliteRepositories {
                 .await
                 .map_err(AppError::from)?;
         }
+        sqlx::query("DELETE FROM helper_problem_tags WHERE user_id=?")
+            .bind(profile.user_id.0)
+            .execute(&mut *tx)
+            .await?;
+        for tag in &profile.problem_tags {
+            sqlx::query("INSERT INTO helper_problem_tags (user_id, tag) VALUES (?, ?)")
+                .bind(profile.user_id.0)
+                .bind(tag)
+                .execute(&mut *tx)
+                .await?;
+        }
         tx.commit().await.map_err(AppError::from)?;
         Ok(())
     }
@@ -477,7 +507,7 @@ impl DispatchRepository for SqliteRepositories {
                  WHERE r.id=? AND r.status='open' AND r.expires_at>unixepoch()
                    AND h.enabled=1 AND h.user_id<>r.requester_id
                    AND EXISTS (SELECT 1 FROM helper_areas a WHERE a.user_id=h.user_id AND a.area_id=r.area_id)
-                   AND EXISTS (SELECT 1 FROM helper_help_kinds k WHERE k.user_id=h.user_id AND k.help_kind=r.help_kind)
+                   AND EXISTS (SELECT 1 FROM helper_help_kinds k WHERE k.user_id=h.user_id AND k.help_kind=r.help_kind) AND (NOT EXISTS (SELECT 1 FROM helper_problem_tags hp WHERE hp.user_id=h.user_id) OR NOT EXISTS (SELECT 1 FROM request_problem_tags rp WHERE rp.request_id=r.id) OR EXISTS (SELECT 1 FROM request_problem_tags rp JOIN helper_problem_tags hp ON hp.tag=rp.tag WHERE rp.request_id=r.id AND hp.user_id=h.user_id))
                  ON CONFLICT(request_id, helper_id) DO UPDATE
                  SET status='pending', request_version=excluded.request_version,
                      view_id=NULL, chat_id=NULL, message_id=NULL, ephemeral_message_id=NULL,

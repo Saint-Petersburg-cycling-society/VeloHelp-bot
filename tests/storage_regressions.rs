@@ -13,6 +13,128 @@ use bike_aid::{
 };
 use chrono::{TimeDelta, Utc};
 
+#[tokio::test]
+async fn problem_preferences_gate_candidates_fanout_and_unsent_notifications() {
+    let (repo, mut request) = setup().await;
+    request.id = bike_aid::domain::HelpRequestId(uuid::Uuid::new_v4());
+    request.problem_tags = vec!["puncture".into()];
+    repo.insert(&request).await.unwrap();
+    let punctures = HelperProfile {
+        user_id: TelegramUserId(2),
+        enabled: true,
+        areas: vec!["center".into()],
+        help_kinds: vec![HelpKind::Technical],
+        problem_tags: vec!["puncture".into()],
+    };
+    repo.upsert_helper(&punctures).await.unwrap();
+    // User 3 is a legacy whole-kind subscriber and must retain notifications.
+    assert_eq!(repo.candidates(request.id).await.unwrap().len(), 2);
+    assert!(bike_aid::domain::is_candidate(&punctures, &request, None));
+    let chains = HelperProfile {
+        problem_tags: vec!["drivetrain".into()],
+        ..punctures.clone()
+    };
+    repo.upsert_helper(&chains).await.unwrap();
+    assert!(!bike_aid::domain::is_candidate(&chains, &request, None));
+    assert_eq!(
+        repo.candidates(request.id).await.unwrap(),
+        vec![TelegramUserId(3)]
+    );
+    repo.fanout(request.id, &[TelegramUserId(2), TelegramUserId(3)])
+        .await
+        .unwrap();
+    let (count,): (i64,) =
+        sqlx::query_as("SELECT count(*) FROM dispatches WHERE request_id=? AND helper_id=2")
+            .bind(request.id.0.to_string())
+            .fetch_one(repo.pool())
+            .await
+            .unwrap();
+    assert_eq!(count, 0);
+    repo.upsert_helper(&punctures).await.unwrap();
+    repo.fanout(request.id, &[TelegramUserId(2)]).await.unwrap();
+    repo.upsert_helper(&chains).await.unwrap();
+    assert!(repo
+        .pending_deliveries()
+        .await
+        .unwrap()
+        .iter()
+        .all(|d| d.helper != TelegramUserId(2)));
+    let invalid = HelperProfile {
+        problem_tags: vec!["unknown".into()],
+        ..chains
+    };
+    assert!(repo.upsert_helper(&invalid).await.is_err());
+    assert_eq!(
+        repo.helper(TelegramUserId(2))
+            .await
+            .unwrap()
+            .unwrap()
+            .problem_tags,
+        vec!["drivetrain"]
+    );
+    request.id = bike_aid::domain::HelpRequestId(uuid::Uuid::new_v4());
+    request.problem_tags.clear();
+    repo.insert(&request).await.unwrap();
+    assert_eq!(
+        repo.candidates(request.id).await.unwrap().len(),
+        2,
+        "uncategorized custom text still reaches kind subscribers"
+    );
+}
+
+#[tokio::test]
+async fn private_manual_address_exports_only_to_owner_and_clears_with_point() {
+    for transition in [
+        "cancel",
+        "resolve",
+        "expire",
+        "withdraw_expired",
+        "delete_helper",
+    ] {
+        let (repo, request) = setup().await;
+        sqlx::query(
+            "UPDATE help_requests SET exact_address='Тестовый адрес, подъезд 2' WHERE id=?",
+        )
+        .bind(request.id.0.to_string())
+        .execute(repo.pool())
+        .await
+        .unwrap();
+        assert!(export_user_json(repo.pool(), TelegramUserId(1))
+            .await
+            .unwrap()
+            .contains("Тестовый адрес"));
+        assert!(!export_user_json(repo.pool(), TelegramUserId(2))
+            .await
+            .unwrap()
+            .contains("Тестовый адрес"));
+        repo.fanout(request.id, &[TelegramUserId(2)]).await.unwrap();
+        if transition != "expire" {
+            repo.accept(request.id, TelegramUserId(2), 0).await.unwrap();
+        }
+        if transition == "cancel" {
+            repo.cancel(request.id, TelegramUserId(1)).await.unwrap();
+        }
+        if transition == "resolve" {
+            repo.resolve(request.id, TelegramUserId(1)).await.unwrap();
+        }
+        if transition == "delete_helper" {
+            delete_user(repo.pool(), TelegramUserId(2)).await.unwrap();
+        }
+        if transition == "expire" || transition == "withdraw_expired" {
+            sqlx::query("UPDATE help_requests SET created_at=unixepoch()-100, expires_at=unixepoch()-1 WHERE id=?")
+                .bind(request.id.0.to_string()).execute(repo.pool()).await.unwrap();
+            if transition == "expire" {
+                repo.expire_due(Utc::now().timestamp()).await.unwrap();
+            } else {
+                repo.withdraw(request.id, TelegramUserId(2)).await.unwrap();
+            }
+        }
+        let closed = repo.request(request.id).await.unwrap();
+        assert_eq!(closed.exact_point, None, "{transition}");
+        assert_eq!(closed.exact_address, None, "{transition}");
+    }
+}
+
 async fn setup() -> (SqliteRepositories, HelpRequest) {
     let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/test-tmp");
     std::fs::create_dir_all(&dir).unwrap();
@@ -33,6 +155,7 @@ async fn setup() -> (SqliteRepositories, HelpRequest) {
             enabled: true,
             areas: vec!["center".into()],
             help_kinds: vec![HelpKind::Technical],
+            problem_tags: vec![],
         })
         .await
         .unwrap();
@@ -45,6 +168,7 @@ async fn setup() -> (SqliteRepositories, HelpRequest) {
     );
     request.area_id = Some("center".into());
     request.exact_point = GeoPoint::new(59.9, 30.3);
+    request.exact_address = Some("Тестовый адрес, дом 1".to_owned());
     request.status = HelpRequestStatus::Open;
     repo.insert(&request).await.unwrap();
     (repo, request)
@@ -318,14 +442,7 @@ async fn upgrade_from_second_migration_backfills_live_wave_and_repeats_cleanly()
             .await
             .unwrap();
     }
-    repo.upsert_helper(&HelperProfile {
-        user_id: TelegramUserId(2),
-        enabled: true,
-        areas: vec!["center".into()],
-        help_kinds: vec![HelpKind::Technical],
-    })
-    .await
-    .unwrap();
+    sqlx::raw_sql("INSERT INTO areas(id,kind,display_name) VALUES('center','district','center'); INSERT INTO helper_profiles(user_id,enabled,updated_at) VALUES(2,1,unixepoch()); INSERT INTO helper_areas(user_id,area_id) VALUES(2,'center'); INSERT INTO helper_help_kinds(user_id,help_kind) VALUES(2,'technical');").execute(repo.pool()).await.unwrap();
     let mut request = HelpRequest::draft(
         TelegramUserId(1),
         HelpKind::Technical,
@@ -335,7 +452,7 @@ async fn upgrade_from_second_migration_backfills_live_wave_and_repeats_cleanly()
     request.status = HelpRequestStatus::Open;
     request.area_id = Some("center".into());
     request.version = 7;
-    repo.insert(&request).await.unwrap();
+    sqlx::query("INSERT INTO help_requests(id,requester_id,help_kind,description,area_id,status,version,expires_at) VALUES(?,1,'technical','upgrade','center','open',7,?)").bind(request.id.0.to_string()).bind(request.expires_at.timestamp()).execute(repo.pool()).await.unwrap();
     sqlx::query("INSERT INTO dispatches(request_id,helper_id) VALUES(?,2)")
         .bind(request.id.0.to_string())
         .execute(repo.pool())
@@ -473,7 +590,7 @@ async fn upgrade_from_fourth_migration_preserves_existing_match() {
     request.matched_helper_id = Some(TelegramUserId(2));
     request.exact_point = GeoPoint::new(59.938, 30.35);
     request.version = 1;
-    repo.insert(&request).await.unwrap();
+    sqlx::query("INSERT INTO help_requests(id,requester_id,help_kind,description,status,matched_helper_id,exact_lat,exact_lon,version,expires_at) VALUES(?,1,'technical','legacy match','matched',2,59.938,30.35,1,?)").bind(request.id.0.to_string()).bind(request.expires_at.timestamp()).execute(repo.pool()).await.unwrap();
     sqlx::raw_sql("CREATE TABLE _sqlx_migrations (version BIGINT PRIMARY KEY, description TEXT NOT NULL, installed_on TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, success BOOLEAN NOT NULL, checksum BLOB NOT NULL, execution_time BIGINT NOT NULL)").execute(repo.pool()).await.unwrap();
     for migration in migrator.iter().take(4) {
         sqlx::query("INSERT INTO _sqlx_migrations(version,description,success,checksum,execution_time) VALUES(?,?,1,?,0)").bind(migration.version).bind(migration.description.as_ref()).bind(migration.checksum.as_ref()).execute(repo.pool()).await.unwrap();

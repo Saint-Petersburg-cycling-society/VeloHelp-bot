@@ -46,6 +46,9 @@ struct Session {
     replaced_menus: Vec<MessageId>,
     editing_request: bool,
     location_warning: Option<String>,
+    location_accuracy: Option<f64>,
+    last_location: Option<GeoPoint>,
+    address_candidates: Vec<crate::domain::AddressCandidate>,
     // None means the client keyboard state is unknown after a restart.
     location_keyboard: Option<bool>,
     keyboard_messages: Vec<MessageId>,
@@ -136,20 +139,31 @@ pub async fn run_polling(
     loop {
         runtime.prune();
         // Rediscover matching waves after partial failures; writes are idempotent.
-        if runtime.deliver().await.is_err() {
-            tracing::warn!("notification pass failed; will retry");
+        if let Err(error) = runtime.deliver().await {
+            tracing::warn!(
+                operation = "notification_pass",
+                reason = error_reason(&error),
+                "notification pass failed; will retry"
+            );
         }
-        let Ok(updates) = runtime
+        let updates = match runtime
             .bot
             .get_updates()
             .offset(offset)
             .timeout(25)
             .allowed_updates(vec![AllowedUpdate::Message, AllowedUpdate::CallbackQuery])
             .await
-        else {
-            tracing::warn!("Telegram polling failed; retrying in 3 seconds");
-            tokio::time::sleep(Duration::from_secs(3)).await;
-            continue;
+        {
+            Ok(updates) => updates,
+            Err(error) => {
+                tracing::warn!(
+                    operation = "get_updates",
+                    reason = error_reason(&error.into()),
+                    "Telegram polling failed; retrying in 3 seconds"
+                );
+                tokio::time::sleep(Duration::from_secs(3)).await;
+                continue;
+            }
         };
         for update in updates {
             offset = i32::try_from(update.id.0)
@@ -160,8 +174,11 @@ pub async fn run_polling(
                 UpdateKind::CallbackQuery(query) => Box::pin(runtime.callback(query)).await,
                 _ => Ok(()),
             };
-            if outcome.is_err() {
-                tracing::warn!("Telegram update handling failed; domain state retained");
+            if let Err(error) = outcome {
+                tracing::warn!(
+                    reason = error_reason(&error),
+                    "Telegram update handling failed; domain state retained"
+                );
             }
         }
     }
@@ -251,7 +268,17 @@ impl Runtime {
                 for token in &rendered.action_tokens {
                     self.registry.remove(token);
                 }
-                return Err(err.into());
+                let error = anyhow::Error::from(err);
+                tracing::warn!(
+                    operation = if message.is_some() {
+                        "edit_card"
+                    } else {
+                        "send_card"
+                    },
+                    reason = error_reason(&error),
+                    "Telegram card delivery failed"
+                );
+                return Err(error);
             }
         };
         if let Some(old) = self.surfaces.insert(
@@ -490,12 +517,32 @@ impl Runtime {
         Ok(())
     }
     async fn home(&mut self, user: TelegramUserId) -> anyhow::Result<()> {
+        self.home_with_notice(user, None).await
+    }
+    async fn home_with_notice(
+        &mut self,
+        user: TelegramUserId,
+        notice: Option<&str>,
+    ) -> anyhow::Result<()> {
         let session = self.session(user);
         session.editing_request = false;
         session.pending_arrival = None;
         session.arrival_text_input = false;
-        let mut ui = Ui::column()
-            .push(Ui::paragraph("VeloHelp"))
+        let mut ui = Ui::column().push(Ui::paragraph("VeloHelp"));
+        if let Some(notice) = notice {
+            ui = ui.push(Ui::paragraph(notice));
+        }
+        if let Some(helper) = self.repo.helper(user).await? {
+            ui = ui.push(Ui::paragraph(if helper.enabled {
+                format!(
+                    "Вы зарегистрированы как помощник · районов: {}. Уведомления включены.",
+                    helper.areas.len()
+                )
+            } else {
+                "Вы зарегистрированы как помощник. Уведомления на паузе.".to_owned()
+            }));
+        }
+        ui = ui
             .push(button_row(Action::OpenCreateRequest))
             .push(button_row(Action::OpenHelperSettings));
         if !self.repo.active_requests(user).await?.is_empty() {
@@ -514,11 +561,12 @@ impl Runtime {
     }
     async fn consent(&mut self, user: TelegramUserId) -> anyhow::Result<()> {
         let ui = Ui::column().push(Ui::paragraph("Перед началом"))
-            .push(Ui::paragraph("Это тестовый бот взаимопомощи, не экстренная служба. Храним Telegram ID, настройки, заявки и время прибытия до закрытия пары. В приглашении помощники видят примерную зону около 1 км; точную точку и адрес — только принявший помощник. В паре имена открывают профили друг друга. При закрытии точка удаляется из БД. Сообщения остаются в Telegram. Скачать или удалить данные можно в «Ещё → Мои данные»."))
+            .push(Ui::paragraph("Это тестовый бот взаимопомощи, не экстренная служба. Храним Telegram ID, настройки, заявки и время прибытия до закрытия пары. В приглашении помощники видят примерную зону около 1 км; точную точку и адрес — только принявший помощник. В паре имена открывают профили друг друга. При закрытии точка и введённый адрес удаляются из БД. Сообщения остаются в Telegram. Скачать или удалить данные можно в «Ещё → Мои данные»."))
             .push(button_row(Action::Consent(self.config.consent_version.clone())))
             .push(button_row(Action::OpenSource));
         self.menu(user, ui).await
     }
+    #[allow(clippy::too_many_lines)]
     async fn message(&mut self, message: Message) -> anyhow::Result<()> {
         if !message.chat.is_private() {
             return Ok(());
@@ -552,6 +600,14 @@ impl Runtime {
             return self.consent(user).await;
         }
         self.session(user).display_name = Some(from.full_name());
+        let operation = match text.split_whitespace().next().unwrap_or("") {
+            "/start" | "/help" => "open_home",
+            "/active" => "open_active",
+            "/cancel" => "cancel_draft",
+            _ if message.location().is_some() => "location_input",
+            _ => "text_input",
+        };
+        tracing::info!(operation, "Telegram input received");
         match text.split_whitespace().next().unwrap_or("") {
             "/start" | "/help" => return self.home(user).await,
             "/active" => return self.active(user).await,
@@ -562,6 +618,8 @@ impl Runtime {
                 let session = self.session(user);
                 session.request = RequestDraft::default();
                 session.location_warning = None;
+                session.location_accuracy = None;
+                session.last_location = None;
                 return self.home(user).await;
             }
             _ => {}
@@ -590,6 +648,39 @@ impl Runtime {
         let point = message
             .location()
             .and_then(|p| GeoPoint::new(p.latitude, p.longitude));
+        if self.session(user).request.step == Some(RequestStep::Address) {
+            let address = text.trim();
+            if address.is_empty() || address.chars().count() > 200 {
+                return self
+                    .notice(user, "Напишите адрес длиной до 200 символов.")
+                    .await;
+            }
+            let draft = &mut self.session(user).request;
+            draft.exact_address = Some(address.to_owned());
+            draft.step = Some(RequestStep::Preview);
+            return self.wizard(user).await;
+        }
+        if self.session(user).request.step == Some(RequestStep::Location)
+            && point.is_none()
+            && !text.is_empty()
+        {
+            if text.chars().count() > 200 {
+                return self
+                    .notice(user, "Напишите улицу, дом и корпус — до 200 символов.")
+                    .await;
+            }
+            let candidates = self.addresses.search(text);
+            if candidates.is_empty() {
+                return self.notice(user, "Адрес не найден. Укажите улицу, дом и корпус, например «Дачный проспект, 17 к3», или отправьте точку на карте.").await;
+            }
+            let unique = candidates.len() == 1;
+            self.session(user).address_candidates = candidates;
+            return if unique {
+                self.select_address(user, 0).await
+            } else {
+                self.wizard(user).await
+            };
+        }
         let draft = &mut self
             .sessions
             .get_mut(&user.0)
@@ -602,6 +693,8 @@ impl Runtime {
             return self.notice(user, reason).await;
         }
         if was_location {
+            self.session(user).request.exact_address = None;
+            self.session(user).address_candidates.clear();
             if point.is_some()
                 && self
                     .bot
@@ -619,6 +712,9 @@ impl Runtime {
                 )
             });
             self.session(user).location_warning = warning;
+            self.session(user).location_accuracy =
+                message.location().and_then(|p| p.horizontal_accuracy);
+            self.session(user).last_location = point;
         }
         self.wizard(user).await
     }
@@ -652,6 +748,8 @@ impl Runtime {
             return Ok(());
         };
         self.bot.answer_callback_query(query.id).await?;
+        let operation = action_operation(&record.action);
+        tracing::info!(operation, "Telegram action received");
         let needs_consent = !matches!(record.action, Action::Consent(_) | Action::OpenSource)
             && !self
                 .repo
@@ -673,7 +771,12 @@ impl Runtime {
         if let Some((session, _)) = self.sessions.get_mut(&user.0) {
             session.callback_menu = None;
         }
-        if result.is_err() {
+        if let Err(error) = &result {
+            tracing::warn!(
+                operation,
+                reason = error_reason(error),
+                "Telegram action failed"
+            );
             self.notice(user,"Действие не выполнено или заявка уже изменилась. Откройте /active; черновик можно продолжить.").await?;
         }
         result
@@ -715,16 +818,32 @@ impl Runtime {
                     HelperDraft {
                         enabled: true,
                         kinds: vec![HelpKind::Technical],
+                        problem_tags: crate::domain::HELP_PROBLEMS
+                            .iter()
+                            .filter(|tag| **tag != "accident")
+                            .map(|tag| (*tag).to_owned())
+                            .collect(),
                         ..Default::default()
                     },
-                    |p| HelperDraft {
-                        areas: p.areas,
-                        kinds: if p.help_kinds.is_empty() {
-                            vec![HelpKind::Technical]
+                    |p| {
+                        let problems = if p.problem_tags.is_empty() {
+                            crate::domain::HELP_PROBLEMS
+                                .iter()
+                                .filter(|tag| {
+                                    crate::domain::problem_kind(tag)
+                                        .is_some_and(|kind| p.help_kinds.contains(&kind))
+                                })
+                                .map(|tag| (*tag).to_owned())
+                                .collect()
                         } else {
-                            p.help_kinds
-                        },
-                        enabled: p.enabled,
+                            p.problem_tags
+                        };
+                        HelperDraft {
+                            areas: p.areas,
+                            kinds: p.help_kinds,
+                            enabled: p.enabled,
+                            problem_tags: problems,
+                        }
                     },
                 );
                 let session = self.session(user);
@@ -753,6 +872,18 @@ impl Runtime {
                     .ok_or_else(|| anyhow::anyhow!("missing helper draft"))?
                     .toggle_kind(kind);
                 self.helper_options_view(user).await?;
+            }
+            Action::ToggleHelperProblem(tag) => {
+                anyhow::ensure!(
+                    crate::domain::problem_kind(&tag).is_some(),
+                    "unknown helper problem"
+                );
+                self.session(user)
+                    .helper
+                    .as_mut()
+                    .ok_or_else(|| anyhow::anyhow!("missing helper draft"))?
+                    .toggle_problem(&tag);
+                self.helper_view(user).await?;
             }
             Action::ToggleEnabled => {
                 let helper = self
@@ -786,9 +917,12 @@ impl Runtime {
                         enabled: helper.enabled,
                         areas: helper.areas,
                         help_kinds: helper.kinds,
+                        problem_tags: helper.problem_tags,
                     })
                     .await?;
-                self.home(user).await?;
+                self.session(user).helper = None;
+                self.home_with_notice(user, Some("Настройки помощника сохранены."))
+                    .await?;
             }
             Action::SelectProblem(problem) => {
                 select_problem(&mut self.session(user).request, &problem)
@@ -799,6 +933,15 @@ impl Runtime {
                 self.session(user).request.step = Some(RequestStep::Description);
                 self.wizard(user).await?;
             }
+            Action::EditAddress => {
+                anyhow::ensure!(
+                    self.session(user).request.can_publish(),
+                    "address needs location"
+                );
+                self.session(user).request.step = Some(RequestStep::Address);
+                self.wizard(user).await?;
+            }
+            Action::SelectAddress(index) => self.select_address(user, index).await?,
             Action::WizardBack => {
                 self.session(user).request.back();
                 self.wizard(user).await?;
@@ -837,8 +980,13 @@ impl Runtime {
                 request.problem_tags = draft.tags;
                 request.bike_description = draft.bike_description;
                 request.exact_point = draft.exact_point;
+                request.exact_address = draft.exact_address;
                 request.area_id = draft.area_id;
                 self.repo.insert(&request).await?;
+                tracing::info!(
+                    operation = "publish_request",
+                    "Request committed; updating card and notifying helpers"
+                );
                 self.metrics
                     .requests_created
                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -846,8 +994,17 @@ impl Runtime {
                 session.request = RequestDraft::default();
                 session.location_warning = None;
                 session.editing_request = false;
-                self.show_request(user, &request).await?;
-                self.deliver().await?;
+                let projection = self.show_request(user, &request).await;
+                let delivery = self.deliver().await;
+                if let Err(error) = projection {
+                    tracing::warn!(
+                        operation = "publish_request_card",
+                        reason = error_reason(&error),
+                        "Request committed but requester card failed"
+                    );
+                    return self.notice(user, "Заявка опубликована. Карточка временно не обновилась — откройте /active. Повторно отправлять заявку не нужно.").await;
+                }
+                delivery?;
             }
             Action::Accept(id, version) => {
                 if self.session(user).location_keyboard == Some(true) {
@@ -964,11 +1121,13 @@ impl Runtime {
             .helper
             .clone()
             .ok_or_else(|| anyhow::anyhow!("missing helper draft"))?;
-        let mut ui = Ui::column().push(Ui::paragraph(format!(
-            "{} районов · выбрано {}",
-            self.areas.len(),
-            helper.areas.len()
-        )));
+        let mut ui = Ui::column()
+            .push(Ui::paragraph("Где и чем можете помочь?"))
+            .push(Ui::paragraph(format!(
+                "{} районов · выбрано {}. Нажмите «Сохранить», чтобы получать заявки.",
+                self.areas.len(),
+                helper.areas.len()
+            )));
         for pair in self.areas.chunks(2) {
             let mut row = Ui::button_row();
             for area in pair {
@@ -984,56 +1143,44 @@ impl Runtime {
             }
             ui = ui.push(row);
         }
-        ui = ui.push(
+        ui = ui.push(helper_options(&helper)).push(
             Ui::button_row()
                 .push(helper_save_button(&helper))
-                .push(Ui::button("Главная", Action::Home))
-                .push(Ui::button("Настройки", Action::HelperOptions)),
+                .push(Ui::button("Главная", Action::Home)),
         );
         self.menu(user, ui).await
     }
     async fn helper_options_view(&mut self, user: TelegramUserId) -> anyhow::Result<()> {
-        let session = self.session(user);
-        let helper = session
-            .helper
-            .clone()
-            .ok_or_else(|| anyhow::anyhow!("missing helper draft"))?;
-        let mut kinds = Ui::button_row();
-        for kind in [HelpKind::Technical, HelpKind::Accident] {
-            let mark = if helper.kinds.contains(&kind) {
-                "✓ "
-            } else {
-                ""
-            };
-            kinds = kinds.push(Ui::button(
-                format!("{mark}{}", kind_label(kind)),
-                Action::ToggleCapability(kind.as_str().to_owned()),
-            ));
+        self.helper_view(user).await
+    }
+    async fn select_address(&mut self, user: TelegramUserId, index: usize) -> anyhow::Result<()> {
+        let candidate = self
+            .session(user)
+            .address_candidates
+            .get(index)
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("address selection expired"))?;
+        let draft = &mut self
+            .sessions
+            .get_mut(&user.0)
+            .expect("session exists")
+            .0
+            .request;
+        if let Err(reason) = apply_input(draft, "", Some(candidate.point), &self.districts) {
+            return self.notice(user, reason).await;
         }
-        self.menu(
-            user,
-            Ui::column()
-                .push(Ui::paragraph("Помощь"))
-                .push(kinds)
-                .push(Ui::button_row().push(Ui::button(
-                    if helper.enabled {
-                        "Уведомления: включены"
-                    } else {
-                        "Уведомления: пауза"
-                    },
-                    Action::ToggleEnabled,
-                )))
-                .push(
-                    Ui::button_row()
-                        .push(Ui::button("Районы", Action::HelperAreas))
-                        .push(helper_save_button(&helper)),
-                ),
-        )
-        .await
+        let session = self.session(user);
+        session.request.exact_address = Some(candidate.label);
+        session.address_candidates.clear();
+        session.location_accuracy = None;
+        session.last_location = Some(candidate.point);
+        session.location_warning = Some("Точка найдена по адресу здания, а не по GPS. При необходимости уточните место на карте.".to_owned());
+        self.wizard(user).await
     }
     async fn wizard(&mut self, user: TelegramUserId) -> anyhow::Result<()> {
         let draft = self.session(user).request.clone();
         let location_warning = self.session(user).location_warning.clone();
+        let accuracy = self.session(user).location_accuracy;
         let mut ui = Ui::column();
         match draft.step.unwrap_or(RequestStep::Description) {
             RequestStep::Description => {
@@ -1050,7 +1197,17 @@ impl Runtime {
             }
             RequestStep::Location => {
                 ui = ui.push(Ui::paragraph("Где вы?"))
-                    .push(Ui::paragraph("Нажмите «Отправить местоположение» ниже. Другую точку можно выбрать через скрепку → Геопозиция. Район определим сами; точку увидит только принявший помощник."));
+                    .push(Ui::paragraph("Отправьте геопозицию кнопкой ниже или напишите улицу, дом и корпус. Точку на карте можно выбрать через скрепку → Геопозиция. Район определим сами; точку и адрес увидит только принявший помощник."));
+                let candidates = self.session(user).address_candidates.clone();
+                if !candidates.is_empty() {
+                    ui = ui.push(Ui::paragraph("Какой адрес?"));
+                    for (index, candidate) in candidates.iter().enumerate() {
+                        ui = ui.push(Ui::button_row().push(Ui::button(
+                            candidate.label.as_str(),
+                            Action::SelectAddress(index),
+                        )));
+                    }
+                }
                 if draft.kind == Some(HelpKind::Accident) {
                     ui = ui.push(Ui::paragraph(
                         "При угрозе жизни обращайтесь в экстренную службу.",
@@ -1073,9 +1230,11 @@ impl Runtime {
                         draft.description,
                         self.area_name(draft.area_id.as_deref())
                     )));
-                if let Some(address) = draft
+                if let Some(address) = &draft.exact_address {
+                    ui = ui.push(Ui::paragraph(format!("Адрес (указан вами): {address}")));
+                } else if let Some(address) = draft
                     .exact_point
-                    .and_then(|point| self.addresses.resolve(point))
+                    .and_then(|point| self.addresses.resolve_with_accuracy(point, accuracy))
                 {
                     ui = ui.push(Ui::paragraph(address));
                 }
@@ -1086,7 +1245,13 @@ impl Runtime {
                     .push(Ui::paragraph("До принятия помощники увидят примерную зону около 1 км на карте; точную точку и адрес — после принятия."))
                     .push(button_row(Action::PublishRequest))
                     .push(button_row(Action::EditDescription))
+                    .push(button_row(Action::EditAddress))
                     .push(Ui::button_row().push(Ui::button("Изменить место", Action::WizardBack)));
+            }
+            RequestStep::Address => {
+                ui = ui.push(Ui::paragraph("Уточните адрес"))
+                    .push(Ui::paragraph("Напишите улицу, дом и корпус, можно добавить ориентир или подъезд. Точка на карте останется прежней. Адрес увидит только принявший помощник."))
+                    .push(button_row(Action::WizardBack));
             }
         }
         self.menu(user, ui.push(button_row(Action::Home))).await
@@ -1166,9 +1331,16 @@ impl Runtime {
             }));
         }
         if let Some(point) = request.exact_point {
-            let address = self
-                .addresses
-                .resolve(point)
+            let accuracy = self
+                .sessions
+                .get(&request.requester_id.0)
+                .filter(|(s, _)| s.last_location == Some(point))
+                .and_then(|(s, _)| s.location_accuracy);
+            let address = request
+                .exact_address
+                .as_ref()
+                .map(|address| format!("Адрес (указан заявителем): {address}"))
+                .or_else(|| self.addresses.resolve_with_accuracy(point, accuracy))
                 .unwrap_or_else(|| "Адрес не найден — ориентируйтесь по карте.".to_owned());
             details.push(InputRichBlock::Paragraph(InputRichBlockParagraph {
                 text: RichText::from(address),
@@ -1404,23 +1576,125 @@ impl Runtime {
                 .iter()
                 .find(|(_, s)| s.owner == delivery.helper && s.request == Some(delivery.request.id))
                 .map(|((_, message), _)| *message);
-            if let Ok(message) = self
+            let message = match self
                 .project(delivery.helper, ui, Some(delivery.request.id), previous)
                 .await
             {
-                self.repo
-                    .mark_delivered(
-                        delivery.request.id,
-                        delivery.helper,
-                        delivery.request.version,
-                        message.0,
-                    )
-                    .await?;
-            } else {
-                tracing::warn!("notification delivery failed; retrying on the next polling pass");
-            }
+                Ok(message) => message,
+                Err(error) => {
+                    let reason = error_reason(&error);
+                    tracing::warn!(
+                        operation = "notify_helper",
+                        reason,
+                        "notification delivery failed; retrying on the next polling pass"
+                    );
+                    // An outage must not serially spend one HTTP timeout on
+                    // every helper before returning to interactive polling.
+                    if matches!(
+                        reason,
+                        "network_timeout"
+                            | "network_connect"
+                            | "network_transport"
+                            | "telegram_response_decode"
+                            | "telegram_rate_limit"
+                    ) {
+                        return Err(error);
+                    }
+                    continue;
+                }
+            };
+            self.repo
+                .mark_delivered(
+                    delivery.request.id,
+                    delivery.helper,
+                    delivery.request.version,
+                    message.0,
+                )
+                .await?;
         }
         Ok(())
+    }
+}
+
+// Only fixed categories reach logs: transport errors can contain token URLs,
+// response bodies can contain coordinates and names, and SQL can contain IDs.
+fn action_operation(action: &Action) -> &'static str {
+    match action {
+        Action::OpenCreateRequest => "open_create_request",
+        Action::OpenHelperSettings => "open_helper_settings",
+        Action::ToggleArea(_) => "toggle_helper_area",
+        Action::ToggleCapability(_) => "toggle_helper_kind",
+        Action::ToggleHelperProblem(_) => "toggle_helper_problem",
+        Action::ToggleEnabled => "toggle_notifications",
+        Action::SaveHelper => "save_helper",
+        Action::SelectProblem(_) => "select_request_problem",
+        Action::SelectAddress(_) => "select_address",
+        Action::EditAddress => "edit_address",
+        Action::EditDescription => "edit_description",
+        Action::WizardNext => "wizard_next",
+        Action::WizardBack => "wizard_back",
+        Action::PublishRequest => "publish_request",
+        Action::Accept(_, _) => "open_arrival",
+        Action::AcceptAt(_, _, _) => "accept_request",
+        Action::EnterArrival(_, _) => "enter_arrival",
+        Action::ArrivalBack(_, _) | Action::AbortAccept(_) => "leave_arrival",
+        Action::Decline(_, _) => "decline_request",
+        Action::Cancel(_) => "cancel_request",
+        Action::Resolve(_) => "resolve_request",
+        Action::Withdraw(_) => "withdraw_help",
+        Action::Home => "open_home",
+        Action::More => "open_more",
+        Action::HelperAreas | Action::HelperOptions => "open_helper_options",
+        Action::ActiveRequests => "open_active",
+        Action::OpenRequest(_) => "open_request",
+        Action::OpenSource => "open_source",
+        Action::Consent(_) => "consent",
+        Action::Privacy => "open_privacy",
+        Action::ExportData => "export_data",
+        Action::ConfirmDelete => "confirm_delete",
+        Action::DeleteData => "delete_data",
+    }
+}
+
+fn error_reason(error: &anyhow::Error) -> &'static str {
+    use teloxide::RequestError;
+    if let Some(error) = error.downcast_ref::<RequestError>() {
+        return match error {
+            RequestError::Validation(_) => "telegram_request_validation",
+            RequestError::Api(error) => {
+                let description = error.to_string().to_ascii_lowercase();
+                if description.contains("message is not modified") {
+                    "message_not_modified"
+                } else if description.contains("message to edit not found") {
+                    "message_missing"
+                } else if description.contains("can't be edited") {
+                    "message_uneditable"
+                } else if description.contains("blocked") || description.contains("forbidden") {
+                    "telegram_forbidden"
+                } else if description.contains("emoji") || description.contains("premium") {
+                    "custom_emoji_denied"
+                } else {
+                    "telegram_api_rejected"
+                }
+            }
+            RequestError::Network(error) if error.is_timeout() => "network_timeout",
+            RequestError::Network(error) if error.is_connect() => "network_connect",
+            RequestError::Network(_) => "network_transport",
+            RequestError::InvalidJson { .. } => "telegram_response_decode",
+            RequestError::RetryAfter(_) => "telegram_rate_limit",
+            RequestError::MigrateToChatId(_) => "chat_migrated",
+            RequestError::Io(_) => "transport_io",
+        };
+    }
+    if error
+        .downcast_ref::<crate::application::AppError>()
+        .is_some()
+    {
+        "domain_or_storage"
+    } else if error.downcast_ref::<sqlx::Error>().is_some() {
+        "storage"
+    } else {
+        "internal_validation"
     }
 }
 
@@ -1556,6 +1830,58 @@ const PROBLEMS: &[(&str, &str)] = &[
     ("accident", "Происшествие. Нужна помощь."),
 ];
 
+fn helper_options(helper: &HelperDraft) -> teloxide_ui::UiNode<Action> {
+    let mut kinds = Ui::button_row();
+    for kind in [HelpKind::Technical, HelpKind::Accident] {
+        let mark = if crate::domain::HELP_PROBLEMS
+            .iter()
+            .filter(|tag| crate::domain::problem_kind(tag) == Some(kind))
+            .all(|tag| helper.problem_tags.iter().any(|selected| selected == tag))
+        {
+            "✓ "
+        } else {
+            ""
+        };
+        kinds = kinds.push(Ui::button(
+            format!(
+                "{mark}{}",
+                if kind == HelpKind::Technical {
+                    "Все поломки"
+                } else {
+                    "Происшествие"
+                }
+            ),
+            Action::ToggleCapability(kind.as_str().to_owned()),
+        ));
+    }
+    let mut ui = Ui::column().push(kinds);
+    for tags in crate::domain::HELP_PROBLEMS[..6].chunks(2) {
+        let mut row = Ui::button_row();
+        for tag in tags {
+            let action = Action::ToggleHelperProblem((*tag).to_owned());
+            let mark = if helper.problem_tags.iter().any(|selected| selected == tag) {
+                "✓ "
+            } else {
+                ""
+            };
+            row = row.push(Ui::button(
+                format!("{mark}{}", views::action_label(&action)),
+                action,
+            ));
+        }
+        ui = ui.push(row);
+    }
+    ui = ui.push(Ui::button_row().push(Ui::button(
+        if helper.enabled {
+            "Уведомления: включены"
+        } else {
+            "Уведомления: пауза"
+        },
+        Action::ToggleEnabled,
+    )));
+    Ui::fragment(ui.nodes)
+}
+
 fn helper_save_button(helper: &HelperDraft) -> teloxide_ui::Button<Action> {
     let ready = !helper.enabled || (!helper.areas.is_empty() && !helper.kinds.is_empty());
     Ui::button("Сохранить", Action::SaveHelper).disabled(!ready)
@@ -1646,6 +1972,22 @@ fn apply_input(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn diagnostic_categories_never_echo_remote_payloads() {
+        let error: anyhow::Error = teloxide::RequestError::Api(teloxide::ApiError::Unknown(
+            "Rejected payload: private address, coordinates, token URL".into(),
+        ))
+        .into();
+        assert_eq!(error_reason(&error), "telegram_api_rejected");
+        assert_eq!(
+            action_operation(&Action::ToggleHelperProblem("private input".into())),
+            "toggle_helper_problem"
+        );
+        assert_eq!(
+            error_reason(&anyhow::anyhow!("private raw error")),
+            "internal_validation"
+        );
+    }
     #[test]
     fn problem_selection_is_single_and_advances_immediately() {
         let mut draft = RequestDraft {

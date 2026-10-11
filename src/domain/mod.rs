@@ -7,11 +7,11 @@ mod arrival;
 mod helper;
 mod request;
 
-pub use address::AddressMap;
+pub use address::{AddressCandidate, AddressMap};
 pub use approximate_location::ApproximateLocation;
 pub use area::DistrictMap;
 pub use arrival::{ArrivalEstimate, ArrivalWindow};
-pub use helper::{AvailabilityWindow, HelpKind, HelperProfile};
+pub use helper::{problem_kind, AvailabilityWindow, HelpKind, HelperProfile, HELP_PROBLEMS};
 pub use request::{
     is_candidate, AcceptOutcome, Dispatch, DispatchStatus, GeoPoint, HelpRequest, HelpRequestId,
     HelpRequestStatus, TelegramUserId,

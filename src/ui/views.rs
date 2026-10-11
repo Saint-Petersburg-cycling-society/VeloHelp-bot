@@ -45,16 +45,19 @@ pub fn icon_id(action: &Action) -> &'static str {
                 "problem.tools"
             }
         }
-        Action::SelectProblem(problem) => match problem.as_str() {
-            "puncture" => "problem.puncture",
-            "drivetrain" => "problem.drivetrain",
-            "brakes" => "problem.brakes",
-            "wheel" => "problem.wheel",
-            "transport" => "problem.transport",
-            "accident" => "problem.accident",
-            _ => "problem.tools",
-        },
-        Action::EditDescription => "action.edit",
+        Action::SelectProblem(problem) | Action::ToggleHelperProblem(problem) => {
+            match problem.as_str() {
+                "puncture" => "problem.puncture",
+                "drivetrain" => "problem.drivetrain",
+                "brakes" => "problem.brakes",
+                "wheel" => "problem.wheel",
+                "transport" => "problem.transport",
+                "accident" => "problem.accident",
+                _ => "problem.tools",
+            }
+        }
+        Action::EditDescription | Action::EditAddress => "action.edit",
+        Action::SelectAddress(_) => "location.point",
         Action::WizardBack | Action::ArrivalBack(_, _) | Action::AbortAccept(_) => "nav.back",
         Action::WizardNext => "nav.next",
         // Publish reuses the resolve checkmark until the icon pack lands.
@@ -99,17 +102,21 @@ pub fn action_label(action: &Action) -> String {
         Action::HelperAreas => "Районы".to_owned(),
         Action::HelperOptions => "Настройки".to_owned(),
         Action::Consent(_) => "Согласен, продолжить".to_owned(),
-        Action::SelectProblem(problem) => match problem.as_str() {
-            "puncture" => "Прокол",
-            "drivetrain" => "Цепь / передачи",
-            "brakes" => "Тормоза",
-            "wheel" => "Колесо",
-            "transport" => "Перевезти велосипед",
-            "accident" => "Происшествие",
-            _ => "Инструменты",
+        Action::SelectProblem(problem) | Action::ToggleHelperProblem(problem) => {
+            match problem.as_str() {
+                "puncture" => "Прокол",
+                "drivetrain" => "Цепь / передачи",
+                "brakes" => "Тормоза",
+                "wheel" => "Колесо",
+                "transport" => "Перевезти велосипед",
+                "accident" => "Происшествие",
+                _ => "Инструменты",
+            }
+            .to_owned()
         }
-        .to_owned(),
         Action::EditDescription => "Изменить описание".to_owned(),
+        Action::EditAddress => "Уточнить адрес".to_owned(),
+        Action::SelectAddress(_) => "Выбрать адрес".to_owned(),
         Action::ToggleEnabled => "Включить / приостановить".to_owned(),
         Action::SaveHelper => "Сохранить".to_owned(),
         Action::ActiveRequests => "Активные заявки".to_owned(),
@@ -193,6 +200,7 @@ pub fn dispatch_card_view(request: &HelpRequest, area: &str) -> Ui<Action> {
                 Ui::paragraph("Заявка уже недоступна для приёма.")
             },
         )
+        .push(button_row(Action::Home))
 }
 
 /// Matched helper view: offers a native map action after a won accept.
@@ -215,6 +223,7 @@ pub fn matched_helper_view(request: &HelpRequest, helper: TelegramUserId) -> Ui<
         }
     }
     ui.push(button_row(Action::Withdraw(request.id)))
+        .push(button_row(Action::Home))
 }
 
 /// Requester view of a matched request (no extra disclosure needed).
@@ -297,6 +306,7 @@ mod tests {
 
     fn sample_request() -> HelpRequest {
         HelpRequest {
+            exact_address: None,
             id: HelpRequestId(Uuid::new_v4()),
             requester_id: TelegramUserId(1),
             help_kind: HelpKind::Technical,

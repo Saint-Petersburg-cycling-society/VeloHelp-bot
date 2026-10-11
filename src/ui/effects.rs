@@ -67,6 +67,7 @@ mod tests {
 
     fn matched_request() -> HelpRequest {
         HelpRequest {
+            exact_address: None,
             id: HelpRequestId(Uuid::new_v4()),
             requester_id: TelegramUserId(1),
             help_kind: HelpKind::Technical,

@@ -186,9 +186,9 @@ SIGINT/SIGTERM останавливают polling и TTL worker. HTTP connect ti
 pyosmium необходим только для подготовки данных; в runtime его нет. JSON адресов
 включается в binary и Corresponding Source, ODbL attribution — в NOTICE.
 
-Версия применяет миграцию 0005 автоматически. Перед обновлением нужна защищённая
+Версия применяет миграцию 0006 автоматически. Перед обновлением нужна защищённая
 резервная копия live DB через SQLite backup API. Старый binary не понимает migration
-5: откат требует остановить сервис и восстановить согласованную копию БД вместе
+6: откат требует остановить сервис и восстановить согласованную копию БД вместе
 с прежними image/source archive. Нельзя копировать открытый WAL raw-cp.
 
 ## EN
@@ -385,7 +385,7 @@ source archive includes the dataset and its ODbL attribution.
 pyosmium is only a data-preparation dependency, absent from runtime. Address JSON
 is embedded in the binary and Corresponding Source, with ODbL attribution in NOTICE.
 
-This version automatically applies migration 0005. Before upgrading, make a protected
+This version automatically applies migration 0006. Before upgrading, make a protected
 live-DB backup through the SQLite backup API. The old binary does not understand
-migration 5: rollback must stop the service and restore the consistent DB backup
+migration 6: rollback must stop the service and restore the consistent DB backup
 with the previous image/source archive. Never raw-copy an open WAL database.

@@ -47,6 +47,7 @@ async fn backup_and_restore_roundtrip() {
         enabled: true,
         areas: vec![],
         help_kinds: vec![],
+        problem_tags: vec![],
     })
     .await
     .unwrap_or(());
