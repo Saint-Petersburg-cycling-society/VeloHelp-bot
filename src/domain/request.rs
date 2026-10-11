@@ -87,6 +87,9 @@ pub struct HelpRequest {
     #[serde(default)]
     pub arrival_window: Option<super::ArrivalWindow>,
     pub exact_point: Option<GeoPoint>,
+    /// Private manual address; lifetime and disclosure follow the exact point.
+    #[serde(default)]
+    pub exact_address: Option<String>,
     pub area_id: Option<String>,
     pub expires_at: DateTime<Utc>,
     pub version: u64,
@@ -113,6 +116,7 @@ impl HelpRequest {
             matched_helper_id: None,
             arrival_window: None,
             exact_point: None,
+            exact_address: None,
             area_id: None,
             expires_at,
             version: 0,
@@ -184,6 +188,15 @@ pub fn is_candidate(
     if !helper.supports_kind(request.help_kind) {
         return false;
     }
+    if !helper.problem_tags.is_empty()
+        && !request.problem_tags.is_empty()
+        && !helper
+            .problem_tags
+            .iter()
+            .any(|tag| request.problem_tags.contains(tag))
+    {
+        return false;
+    }
     match (&helper.areas, request_area.or(request.area_id.as_deref())) {
         (areas, Some(area)) => areas.iter().any(|a| a == area),
         // Without area information there is no coarse match in the MVP.
@@ -216,6 +229,7 @@ mod tests {
             enabled: true,
             areas: vec!["spb-center".to_owned()],
             help_kinds: vec![HelpKind::Technical],
+            problem_tags: vec![],
         };
         assert!(is_candidate(&helper, &req, None));
 

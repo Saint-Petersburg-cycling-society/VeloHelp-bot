@@ -104,9 +104,15 @@ impl SqliteRepositories {
         .bind(user.0)
         .fetch_all(&self.pool)
         .await?;
+        let problems: Vec<(String,)> =
+            sqlx::query_as("SELECT tag FROM helper_problem_tags WHERE user_id=? ORDER BY tag")
+                .bind(user.0)
+                .fetch_all(&self.pool)
+                .await?;
         Ok(Some(HelperProfile {
             user_id: user,
             enabled,
+            problem_tags: problems.into_iter().map(|r| r.0).collect(),
             areas: areas.into_iter().map(|r| r.0).collect(),
             help_kinds: kinds
                 .into_iter()
@@ -154,6 +160,7 @@ impl SqliteRepositories {
                 _ => return Err(invalid()),
             },
             exact_point: lat.zip(lon).and_then(|(lat, lon)| GeoPoint::new(lat, lon)),
+            exact_address: row.try_get("exact_address")?,
             area_id: row.try_get("area_id")?,
             expires_at: DateTime::<Utc>::from_timestamp(row.try_get("expires_at")?, 0)
                 .ok_or_else(invalid)?,
@@ -184,7 +191,7 @@ impl SqliteRepositories {
     /// # Errors
     /// Returns storage errors.
     pub async fn candidates(&self, id: HelpRequestId) -> Result<Vec<TelegramUserId>, AppError> {
-        let rows: Vec<(i64,)> = sqlx::query_as("SELECT h.user_id FROM helper_profiles h JOIN help_requests r ON r.id=? WHERE h.enabled=1 AND h.user_id<>r.requester_id AND EXISTS (SELECT 1 FROM helper_areas a WHERE a.user_id=h.user_id AND a.area_id=r.area_id) AND EXISTS (SELECT 1 FROM helper_help_kinds k WHERE k.user_id=h.user_id AND k.help_kind=r.help_kind)")
+        let rows: Vec<(i64,)> = sqlx::query_as("SELECT h.user_id FROM helper_profiles h JOIN help_requests r ON r.id=? WHERE h.enabled=1 AND h.user_id<>r.requester_id AND EXISTS (SELECT 1 FROM helper_areas a WHERE a.user_id=h.user_id AND a.area_id=r.area_id) AND EXISTS (SELECT 1 FROM helper_help_kinds k WHERE k.user_id=h.user_id AND k.help_kind=r.help_kind) AND (NOT EXISTS (SELECT 1 FROM helper_problem_tags hp WHERE hp.user_id=h.user_id) OR NOT EXISTS (SELECT 1 FROM request_problem_tags rp WHERE rp.request_id=r.id) OR EXISTS (SELECT 1 FROM request_problem_tags rp JOIN helper_problem_tags hp ON hp.tag=rp.tag WHERE rp.request_id=r.id AND hp.user_id=h.user_id))")
             .bind(uuid_text(id)).fetch_all(&self.pool).await?;
         Ok(rows.into_iter().map(|r| TelegramUserId(r.0)).collect())
     }
@@ -192,7 +199,7 @@ impl SqliteRepositories {
     /// # Errors
     /// Returns storage errors.
     pub async fn pending_deliveries(&self) -> Result<Vec<PendingDelivery>, AppError> {
-        let rows: Vec<(String,i64)> = sqlx::query_as("SELECT d.request_id, d.helper_id FROM dispatches d JOIN help_requests r ON r.id=d.request_id JOIN helper_profiles h ON h.user_id=d.helper_id WHERE d.status='pending' AND d.sent_at IS NULL AND r.status='open' AND r.version=d.request_version AND r.expires_at>unixepoch() AND h.enabled=1 LIMIT 100")
+        let rows: Vec<(String,i64)> = sqlx::query_as("SELECT d.request_id, d.helper_id FROM dispatches d JOIN help_requests r ON r.id=d.request_id JOIN helper_profiles h ON h.user_id=d.helper_id WHERE d.status='pending' AND d.sent_at IS NULL AND r.status='open' AND r.version=d.request_version AND r.expires_at>unixepoch() AND h.enabled=1 AND EXISTS (SELECT 1 FROM helper_areas a WHERE a.user_id=h.user_id AND a.area_id=r.area_id) AND EXISTS (SELECT 1 FROM helper_help_kinds k WHERE k.user_id=h.user_id AND k.help_kind=r.help_kind) AND (NOT EXISTS (SELECT 1 FROM helper_problem_tags hp WHERE hp.user_id=h.user_id) OR NOT EXISTS (SELECT 1 FROM request_problem_tags rp WHERE rp.request_id=r.id) OR EXISTS (SELECT 1 FROM request_problem_tags rp JOIN helper_problem_tags hp ON hp.tag=rp.tag WHERE rp.request_id=r.id AND hp.user_id=h.user_id)) LIMIT 100")
             .fetch_all(&self.pool).await?;
         let mut deliveries = Vec::new();
         for (id, helper) in rows {

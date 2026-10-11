@@ -69,6 +69,7 @@ async fn concurrent_accept_has_exactly_one_winner() {
             enabled: true,
             areas: vec![area.to_owned()],
             help_kinds: vec![HelpKind::Technical],
+            problem_tags: vec![],
         })
         .await
         .unwrap();
@@ -180,6 +181,7 @@ async fn cancel_races_accept_without_panic() {
         enabled: true,
         areas: vec![area.to_owned()],
         help_kinds: vec![HelpKind::Technical],
+        problem_tags: vec![],
     })
     .await
     .unwrap();
@@ -262,6 +264,7 @@ async fn expiry_boundary_marks_open_expired() {
         enabled: true,
         areas: vec![area.to_owned()],
         help_kinds: vec![HelpKind::Technical],
+        problem_tags: vec![],
     })
     .await
     .unwrap();

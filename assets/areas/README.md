@@ -37,7 +37,7 @@ python3 assets/areas/export.py --cache-dir work/osm-districts
 [Saint Petersburg PBF](https://download.openstreetmap.fr/extracts/russia/northwestern_federal_district/saint_petersburg.osm.pbf),
 snapshot `2026-10-09T00:26:05Z`. SHA-256 исходного PBF:
 `944d36ac8d7846dc43f72607f721e031cae442dfe03b8dcefcd704e4e00cbb86`.
-120969 уникальных адресных точек и 35459 именованных дорожных геометрий.
+9799 адресных узлов, 111869 контуров зданий и 35459 именованных дорожных геометрий.
 Данные также © OpenStreetMap contributors, ODbL-1.0; код экспортёра — AGPL-3.0-only.
 
 Подготовка требует pyosmium; runtime читает только готовый встроенный JSON:
@@ -50,12 +50,16 @@ work/osm-venv/bin/python assets/areas/export-addresses.py --pbf work/saint_peter
 
 PBF скачивается по указанному публичному URL до подготовки; для воспроизводимости
 используйте snapshot с указанным hash, поскольку URL регулярно обновляется.
-Ноды адресов и центры bbox зданий формируют приблизительные ориентиры; дороги
-проверяются по расстоянию до сегмента, не только до узла. Поиск возвращает дом
-не дальше 60 м (при конкурирующей улице приоритет ей, если дом дальше 30 м) или
-именованную улицу не дальше 80 м. Подпись всегда «Рядом». При отсутствии кандидата
-показывается карта без выдуманного адреса. Номер квартиры и пользовательские точки
-в этот публичный snapshot не добавляются. При обновлении пересоберите binary.
+Контуры зданий сохраняют внутренние дворы: положение внутри двора не считается
+положением внутри здания. Дом определяется по контуру или адресному узлу до 20 м,
+а не ближайшему bbox-центру; для разных адресов нужен отрыв не меньше 15 м
+(или двойного GPS-радиуса). GPS-радиус больше 25 м исключает номер дома.
+Именованная улица ищется по сегментам до 80 м. Подпись всегда «Рядом».
+Без кандидата показывается карта без выдуманного адреса. Локальный поиск понимает
+улицу, дом, корпус и дробный номер; неоднозначность требует выбора человека.
+Публичная точка найденного здания лежит внутри его контура и не обещает найти вход.
+Пользовательские адреса и точки в snapshot не добавляются. При обновлении данных
+пересоберите binary.
 
 ## EN
 
@@ -94,7 +98,7 @@ district. Accuracy is not persisted in the domain database.
 [Saint Petersburg PBF](https://download.openstreetmap.fr/extracts/russia/northwestern_federal_district/saint_petersburg.osm.pbf),
 snapshot `2026-10-09T00:26:05Z`. Source PBF SHA-256:
 `944d36ac8d7846dc43f72607f721e031cae442dfe03b8dcefcd704e4e00cbb86`.
-It contains 120969 unique address points and 35459 named road geometries.
+It contains 9799 address nodes, 111869 building outlines and 35459 named road geometries.
 Data is © OpenStreetMap contributors under ODbL-1.0; exporter code is AGPL-3.0-only.
 
 Preparation uses pyosmium; runtime only reads the prebuilt embedded JSON:
@@ -106,10 +110,13 @@ work/osm-venv/bin/python assets/areas/export-addresses.py --pbf work/saint_peter
 ```
 
 Download the public PBF before preparation; reproducibility requires the snapshot
-with the recorded hash because the URL is regularly updated. Address nodes and
-building bounding-box centers give approximate landmarks. Roads are measured against
-segments, not just nodes. Lookup returns houses within 60 m (a competing street
-wins if the house is more than 30 m away) or named streets within 80 m. Labels
-always say “Рядом”. Without a candidate, show the map without inventing an address.
-No apartment numbers or user points are added to this public snapshot. Rebuild
-the binary when refreshing the data.
+with the recorded hash because the URL is regularly updated. Outlines retain
+courtyard holes: courtyard points are not classified as inside a building.
+House lookup uses outlines/address nodes within 20 m, not nearest bbox centers.
+Different addresses require at least 15 m separation or twice the GPS radius;
+a GPS radius over 25 m suppresses the number. Named street segments are bounded
+to 80 m. Labels always say “Рядом”. Without a candidate, show only the map.
+Local search understands street, house, corpus and slash numbers; ambiguity needs
+a human choice. The public building point lies within its outline and does not
+claim to locate the entrance. User addresses and points never enter the snapshot.
+Rebuild the binary after refreshing data.

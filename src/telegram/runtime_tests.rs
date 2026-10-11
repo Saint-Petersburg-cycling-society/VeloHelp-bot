@@ -35,6 +35,8 @@ struct ApiStub {
     reject_edit: Arc<AtomicBool>,
     reject_map: Arc<AtomicBool>,
     reject_location_delete: Arc<AtomicBool>,
+    reject_rich: Arc<AtomicBool>,
+    reject_keyboard_delete: Arc<AtomicBool>,
 }
 impl ApiStub {
     #[allow(clippy::too_many_lines)]
@@ -54,6 +56,10 @@ impl ApiStub {
         let map_worker = reject_map.clone();
         let reject_location_delete = Arc::new(AtomicBool::new(false));
         let location_delete_worker = reject_location_delete.clone();
+        let reject_rich = Arc::new(AtomicBool::new(false));
+        let rich_worker = reject_rich.clone();
+        let reject_keyboard_delete = Arc::new(AtomicBool::new(false));
+        let keyboard_delete_worker = reject_keyboard_delete.clone();
         let thread = std::thread::spawn(move || {
             let mut next_id = 1;
             let mut messages = HashMap::new();
@@ -142,7 +148,14 @@ impl ApiStub {
                 let location_delete_denied = method == "deletemessage"
                     && body["message_id"] == 500
                     && location_delete_worker.swap(false, Ordering::Relaxed);
-                let response = if keyboard_edit {
+                let rich_denied = body.get("rich_message").is_some()
+                    && rich_worker.swap(false, Ordering::Relaxed);
+                let keyboard_delete_denied = method == "deletemessage"
+                    && body["message_id"] != 500
+                    && keyboard_delete_worker.swap(false, Ordering::Relaxed);
+                let response = if rich_denied {
+                    json!({"ok":false,"error_code":500,"description":"Temporarily unavailable"})
+                } else if keyboard_edit {
                     json!({"ok":false,"error_code":400,"description":"Bad Request: message can't be edited"})
                 } else if map_denied {
                     json!({"ok":false,"error_code":500,"description":"Location delivery temporarily unavailable"})
@@ -150,7 +163,7 @@ impl ApiStub {
                     json!({"ok":false,"error_code":400,"description":"Bad Request: message to edit not found"})
                 } else if denied {
                     json!({"ok":false,"error_code":400,"description":"Bad Request: CUSTOM_EMOJI_NOT_ALLOWED"})
-                } else if location_delete_denied {
+                } else if location_delete_denied || keyboard_delete_denied {
                     json!({"ok":false,"error_code":400,"description":"Bad Request: message can't be deleted"})
                 } else {
                     json!({"ok":true,"result":result})
@@ -183,6 +196,8 @@ impl ApiStub {
             reject_edit,
             reject_map,
             reject_location_delete,
+            reject_rich,
+            reject_keyboard_delete,
         }
     }
 }
@@ -423,7 +438,8 @@ async fn telegram_flow_consent_helper_publish_accept_resolve_and_stale_replay() 
     let replaced_menu = runtime.session(TelegramUserId(2)).menu.unwrap();
     let stale_area = callback(&runtime, 2, &Action::ToggleArea("spb-tsentralny".into()));
     api.reject_edit.store(true, Ordering::Relaxed);
-    press(&mut runtime, 2, Action::HelperOptions).await;
+    press(&mut runtime, 2, Action::ToggleEnabled).await;
+    press(&mut runtime, 2, Action::ToggleEnabled).await;
     assert!(!runtime.surfaces.contains_key(&(2, replaced_menu)));
     Box::pin(runtime.callback(stale_area)).await.unwrap();
     assert_eq!(
@@ -464,7 +480,6 @@ async fn telegram_flow_consent_helper_publish_accept_resolve_and_stale_replay() 
         Action::ToggleCapability("technical".into()),
     )
     .await;
-    press(&mut runtime, 2, Action::HelperAreas).await;
     assert_eq!(
         menu_actions(&runtime, 2)
             .iter()
@@ -714,18 +729,29 @@ async fn smoke_all_districts_settings_pause_and_profile_recovery() {
             index + 1
         );
     }
-    press(&mut runtime, 2, Action::HelperOptions).await;
     press(&mut runtime, 2, Action::ToggleCapability("accident".into())).await;
-    press(&mut runtime, 2, Action::HelperAreas).await;
     assert!(menu_actions(&runtime, 2)
         .iter()
-        .all(|a| !matches!(a, Action::ToggleCapability(_) | Action::ToggleEnabled)));
+        .any(|a| matches!(a, Action::ToggleCapability(_))));
+    assert!(menu_actions(&runtime, 2).contains(&Action::ToggleEnabled));
     press(&mut runtime, 2, Action::SaveHelper).await;
     let profile = runtime.repo.helper(user).await.unwrap().unwrap();
     assert_eq!(profile.areas.len(), 18);
     assert_eq!(profile.help_kinds.len(), 2);
     assert!(profile.help_kinds.contains(&HelpKind::Technical));
     assert!(profile.help_kinds.contains(&HelpKind::Accident));
+    assert!(runtime.session(user).helper.is_none());
+    let card = {
+        let bodies = api.bodies.lock().unwrap();
+        bodies
+            .iter()
+            .rev()
+            .find(|b| b["chat_id"] == 2 && b.get("rich_message").is_some())
+            .unwrap()
+            .to_string()
+    };
+    assert!(card.contains("Настройки помощника сохранены"));
+    assert!(card.contains("Вы зарегистрированы как помощник"));
 
     // Fresh adapter/session registry, same authoritative database as after a restart.
     let repo = runtime.repo.clone();
@@ -739,7 +765,6 @@ async fn smoke_all_districts_settings_pause_and_profile_recovery() {
         runtime.session(user).helper.as_ref().unwrap().areas.len(),
         18
     );
-    press(&mut runtime, 2, Action::HelperOptions).await;
     let stale_pause = callback(&runtime, 2, &Action::ToggleEnabled);
     Box::pin(runtime.callback(stale_pause.clone()))
         .await
@@ -766,10 +791,8 @@ async fn smoke_all_districts_settings_pause_and_profile_recovery() {
         0
     );
     press(&mut runtime, 2, Action::OpenHelperSettings).await;
-    press(&mut runtime, 2, Action::HelperOptions).await;
     press(&mut runtime, 2, Action::ToggleEnabled).await;
     assert!(!menu_actions(&runtime, 2).contains(&Action::SaveHelper));
-    press(&mut runtime, 2, Action::HelperAreas).await;
     press(&mut runtime, 2, Action::ToggleArea(areas[17].clone())).await;
     press(&mut runtime, 2, Action::SaveHelper).await;
     let restored = runtime.repo.helper(user).await.unwrap().unwrap();
@@ -1406,4 +1429,254 @@ async fn smoke_commands_reopen_menu_and_buttons_edit_clicked_message() {
         visible_messages(&api, 1),
         std::collections::HashSet::from([i64::from(recovered.0)])
     );
+}
+
+#[tokio::test]
+#[allow(clippy::too_many_lines)]
+async fn smoke_manual_address_edit_match_withdraw_cancel_and_return_home() {
+    let api = ApiStub::new();
+    let mut runtime = test_runtime(&api).await;
+    for user in [1, 2] {
+        Box::pin(runtime.message(message(user, "/start", None)))
+            .await
+            .unwrap();
+        press(&mut runtime, user, Action::Consent("v1".into())).await;
+    }
+    press(&mut runtime, 2, Action::OpenHelperSettings).await;
+    press(&mut runtime, 2, Action::ToggleArea("spb-kirovsky".into())).await;
+    press(&mut runtime, 2, Action::SaveHelper).await;
+    press(&mut runtime, 1, Action::OpenCreateRequest).await;
+    press(&mut runtime, 1, Action::SelectProblem("puncture".into())).await;
+    Box::pin(runtime.message(message(1, "Неизвестная улица 9999", None)))
+        .await
+        .unwrap();
+    assert_eq!(
+        runtime.session(TelegramUserId(1)).request.step,
+        Some(crate::ui::RequestStep::Location)
+    );
+    Box::pin(runtime.message(message(1, "Дачный 17 к", None)))
+        .await
+        .unwrap();
+    assert!(
+        menu_actions(&runtime, 1)
+            .iter()
+            .filter(|a| matches!(a, Action::SelectAddress(_)))
+            .count()
+            >= 2
+    );
+    let old_address = callback(&runtime, 1, &Action::SelectAddress(0));
+    Box::pin(runtime.message(message(1, "Дачный проспект, дом 17 корпус 3", None)))
+        .await
+        .unwrap();
+    assert_eq!(
+        runtime.session(TelegramUserId(1)).request.step,
+        Some(crate::ui::RequestStep::Preview)
+    );
+    let point = runtime.session(TelegramUserId(1)).request.exact_point;
+    Box::pin(runtime.callback(old_address)).await.unwrap();
+    assert_eq!(
+        runtime.session(TelegramUserId(1)).request.exact_point,
+        point
+    );
+    press(&mut runtime, 1, Action::EditAddress).await;
+    Box::pin(runtime.message(message(1, "", None)))
+        .await
+        .unwrap();
+    assert_eq!(
+        runtime.session(TelegramUserId(1)).request.step,
+        Some(crate::ui::RequestStep::Address)
+    );
+    Box::pin(runtime.message(message(1, "Дачный проспект, 17 к3, подъезд 2", None)))
+        .await
+        .unwrap();
+    assert_eq!(
+        runtime.session(TelegramUserId(1)).request.exact_point,
+        point
+    );
+    press(&mut runtime, 1, Action::PublishRequest).await;
+    let request = runtime
+        .repo
+        .active_requests(TelegramUserId(1))
+        .await
+        .unwrap()
+        .pop()
+        .unwrap();
+    assert_eq!(
+        request.exact_address.as_deref(),
+        Some("Дачный проспект, 17 к3, подъезд 2")
+    );
+    assert!(!api
+        .bodies
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|b| b["chat_id"] == 2)
+        .any(|b| b.to_string().contains("подъезд 2")));
+    accept_after(&mut runtime, 2, request.id, 0, 15, 30).await;
+    assert!(api
+        .bodies
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|b| b["chat_id"] == 2)
+        .any(|b| b.to_string().contains("подъезд 2")));
+    press(&mut runtime, 2, Action::Withdraw(request.id)).await;
+    assert_eq!(
+        runtime
+            .repo
+            .request(request.id)
+            .await
+            .unwrap()
+            .exact_address,
+        request.exact_address
+    );
+    let _ = callback(&runtime, 2, &Action::Home);
+    press(&mut runtime, 1, Action::Cancel(request.id)).await;
+    assert_eq!(
+        runtime
+            .repo
+            .request(request.id)
+            .await
+            .unwrap()
+            .exact_address,
+        None
+    );
+    press(&mut runtime, 2, Action::Home).await;
+    assert!(menu_actions(&runtime, 2).contains(&Action::OpenHelperSettings));
+}
+
+#[tokio::test]
+async fn smoke_failed_publish_card_recovers_without_duplicate_request() {
+    let api = ApiStub::new();
+    let mut runtime = test_runtime(&api).await;
+    Box::pin(runtime.message(message(1, "/start", None)))
+        .await
+        .unwrap();
+    press(&mut runtime, 1, Action::Consent("v1".into())).await;
+    press(&mut runtime, 1, Action::OpenCreateRequest).await;
+    press(&mut runtime, 1, Action::SelectProblem("puncture".into())).await;
+    api.reject_keyboard_delete.store(true, Ordering::Relaxed);
+    Box::pin(runtime.message(message(1, "", GeoPoint::new(59.938, 30.35))))
+        .await
+        .unwrap();
+    runtime.deliver().await.unwrap();
+    assert_eq!(
+        runtime.session(TelegramUserId(1)).keyboard_messages.len(),
+        0
+    );
+    let publish = callback(&runtime, 1, &Action::PublishRequest);
+    api.reject_rich.store(true, Ordering::Relaxed);
+    Box::pin(runtime.callback(publish.clone())).await.unwrap();
+    assert_eq!(
+        runtime
+            .repo
+            .active_requests(TelegramUserId(1))
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
+    assert!(api.bodies.lock().unwrap().iter().any(|b| b["text"]
+        .as_str()
+        .is_some_and(|text| text.contains("Заявка опубликована"))));
+    // The previous callback may remain valid when edit failed; it must never
+    // insert a second request even if delivered again before the next /active.
+    assert!(Box::pin(runtime.callback(publish)).await.is_err());
+    assert_eq!(
+        runtime
+            .repo
+            .active_requests(TelegramUserId(1))
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
+    Box::pin(runtime.message(message(1, "/active", None)))
+        .await
+        .unwrap();
+    assert!(menu_actions(&runtime, 1)
+        .iter()
+        .any(|a| matches!(a, Action::Cancel(_))));
+}
+
+#[tokio::test]
+#[allow(clippy::too_many_lines)]
+async fn smoke_each_problem_reaches_only_its_selected_helper() {
+    let api = ApiStub::new();
+    let mut runtime = test_runtime(&api).await;
+    let helpers = [2, 3, 4, 6, 7, 8, 9];
+    for (problem, helper) in crate::domain::HELP_PROBLEMS.iter().zip(helpers) {
+        Box::pin(runtime.message(message(helper, "/start", None)))
+            .await
+            .unwrap();
+        press(&mut runtime, helper, Action::Consent("v1".into())).await;
+        press(&mut runtime, helper, Action::OpenHelperSettings).await;
+        press(
+            &mut runtime,
+            helper,
+            Action::ToggleArea("spb-kirovsky".into()),
+        )
+        .await;
+        press(
+            &mut runtime,
+            helper,
+            Action::ToggleCapability("technical".into()),
+        )
+        .await;
+        assert!(!menu_actions(&runtime, helper).contains(&Action::SaveHelper));
+        let action = if *problem == "accident" {
+            Action::ToggleCapability("accident".into())
+        } else {
+            Action::ToggleHelperProblem((*problem).to_owned())
+        };
+        press(&mut runtime, helper, action).await;
+        press(&mut runtime, helper, Action::SaveHelper).await;
+        let profile = runtime
+            .repo
+            .helper(TelegramUserId(helper))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(profile.problem_tags, vec![(*problem).to_owned()]);
+    }
+    for (index, (problem, helper)) in crate::domain::HELP_PROBLEMS.iter().zip(helpers).enumerate() {
+        let requester = 20 + i64::try_from(index).unwrap();
+        Box::pin(runtime.message(message(requester, "/start", None)))
+            .await
+            .unwrap();
+        press(&mut runtime, requester, Action::Consent("v1".into())).await;
+        press(&mut runtime, requester, Action::OpenCreateRequest).await;
+        press(
+            &mut runtime,
+            requester,
+            Action::SelectProblem((*problem).to_owned()),
+        )
+        .await;
+        Box::pin(runtime.message(message(requester, "Дачный 17к3", None)))
+            .await
+            .unwrap();
+        press(&mut runtime, requester, Action::PublishRequest).await;
+        let request = runtime
+            .repo
+            .active_requests(TelegramUserId(requester))
+            .await
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert_eq!(
+            runtime.repo.candidates(request.id).await.unwrap(),
+            vec![TelegramUserId(helper)]
+        );
+        let notified: Vec<_> = runtime
+            .surfaces
+            .values()
+            .filter(|s| s.request == Some(request.id) && s.owner.0 != requester)
+            .map(|s| s.owner)
+            .collect();
+        assert_eq!(notified, vec![TelegramUserId(helper)], "{problem}");
+        press(&mut runtime, requester, Action::Cancel(request.id)).await;
+        let terminal = callback(&runtime, helper, &Action::Home);
+        Box::pin(runtime.callback(terminal)).await.unwrap();
+        assert!(menu_actions(&runtime, helper).contains(&Action::OpenHelperSettings));
+    }
 }

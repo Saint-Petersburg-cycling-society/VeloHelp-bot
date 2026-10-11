@@ -57,7 +57,14 @@ CHECK требует обе границы или обе NULL и `from <= until`
 
 Requester получает эти поля со своей заявкой в JSON export; helper получает
 только собственные оценки в `arrival_estimates`, без чужой точной точки.
-Имена и вычисленные адреса в доменной БД не сохраняются. Адрес — публичный
+Имена и вычисленные адреса в доменной БД не сохраняются. Введённый вручную
+`exact_address` хранится отдельно вместе с точкой и очищается SQL trigger при
+закрытии или удалении точки; виден только requester и текущей паре.
+Миграция 0006 добавляет это поле и `helper_problem_tags`: пустой список сохраняет
+подписку старого помощника на весь тип помощи. Непустой фильтр требует пересечения
+с request_problem_tags; заявки со свободным текстом без тегов используют тип.
+Фильтр проверяют candidates, fanout и выдача недоставленных уведомлений.
+Export/request retention и удаление аккаунта распространяются на новые поля. Адрес — публичный
 ориентир из встроенного ODbL snapshot, а не история геокодирования пользователей.
 Upgrade с 0004 оставляет существующие пары и точки, заполняя ETA значением NULL;
 повторное применение миграций проверено.
@@ -131,7 +138,13 @@ on closed requests.
 
 Requesters export these fields with their own requests; helpers export only their
 own `arrival_estimates`, without another user’s exact point. Names and computed
-addresses are not stored in the domain DB. An address is a public landmark from
+addresses are not stored in the domain DB. Manual `exact_address` is stored
+with the point and cleared by a SQL trigger on closure or point removal; only
+the requester and current pair see it. Migration 0006 adds this field and
+`helper_problem_tags`: an empty list preserves legacy whole-kind subscriptions.
+Nonempty filters must intersect request_problem_tags; untagged custom requests
+still use the help kind. Candidates, fanout and unsent-delivery reads enforce
+the filter. Export, request retention and account deletion cover both new fields. An address is a public landmark from
 the embedded ODbL snapshot, not a user geocoding history. Upgrade from 0004 retains
 existing pairs and points with NULL ETA; migration replay is tested.
 

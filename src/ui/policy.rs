@@ -46,13 +46,16 @@ pub const fn stale_policy(action: &Action) -> StalePolicy {
         | Action::Consent(_)
         | Action::ToggleArea(_)
         | Action::ToggleCapability(_)
+        | Action::ToggleHelperProblem(_)
         | Action::HelperAreas
         | Action::HelperOptions
         | Action::ToggleEnabled
         | Action::WizardNext
         | Action::WizardBack
         | Action::SelectProblem(_)
-        | Action::EditDescription => StalePolicy::Reject,
+        | Action::EditDescription
+        | Action::EditAddress
+        | Action::SelectAddress(_) => StalePolicy::Reject,
         // Decline/cancel/resolve apply to the latest state safely.
         Action::Decline(_, _) | Action::Cancel(_) | Action::Resolve(_) => {
             StalePolicy::ApplyToLatest

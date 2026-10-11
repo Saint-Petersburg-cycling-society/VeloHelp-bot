@@ -12,6 +12,7 @@ use crate::domain::{GeoPoint, HelpKind};
 pub enum RequestStep {
     Description,
     Location,
+    Address,
     Preview,
 }
 
@@ -23,6 +24,7 @@ pub struct RequestDraft {
     pub description: String,
     pub bike_description: Option<String>,
     pub exact_point: Option<GeoPoint>,
+    pub exact_address: Option<String>,
     pub area_id: Option<String>,
     pub step: Option<RequestStep>,
     /// Double-click guard: set after the first publish attempt.
@@ -35,7 +37,9 @@ impl RequestDraft {
         self.step = Some(match self.step {
             None => RequestStep::Description,
             Some(RequestStep::Description) => RequestStep::Location,
-            Some(RequestStep::Location | RequestStep::Preview) => RequestStep::Preview,
+            Some(RequestStep::Location | RequestStep::Address | RequestStep::Preview) => {
+                RequestStep::Preview
+            }
         });
     }
 
@@ -46,6 +50,7 @@ impl RequestDraft {
                 RequestStep::Description
             }
             Some(RequestStep::Preview) => RequestStep::Location,
+            Some(RequestStep::Address) => RequestStep::Preview,
         });
     }
 
@@ -53,6 +58,10 @@ impl RequestDraft {
     #[must_use]
     pub fn can_publish(&self) -> bool {
         self.kind.is_some()
+            && self
+                .exact_address
+                .as_ref()
+                .is_none_or(|text| !text.trim().is_empty() && text.chars().count() <= 200)
             && !self.description.trim().is_empty()
             && self.description.chars().count() <= 4000
             && self
@@ -81,6 +90,8 @@ pub struct HelperDraft {
     pub areas: Vec<String>,
     pub kinds: Vec<HelpKind>,
     pub enabled: bool,
+    #[serde(default)]
+    pub problem_tags: Vec<String>,
 }
 
 impl HelperDraft {
@@ -95,11 +106,40 @@ impl HelperDraft {
 
     /// Toggles one help kind.
     pub fn toggle_kind(&mut self, kind: HelpKind) {
-        if let Some(pos) = self.kinds.iter().position(|k| *k == kind) {
-            self.kinds.remove(pos);
-        } else {
-            self.kinds.push(kind);
+        let all_selected = crate::domain::HELP_PROBLEMS
+            .iter()
+            .filter(|tag| crate::domain::problem_kind(tag) == Some(kind))
+            .all(|tag| self.problem_tags.iter().any(|selected| selected == tag));
+        self.problem_tags
+            .retain(|tag| crate::domain::problem_kind(tag) != Some(kind));
+        if !all_selected {
+            self.problem_tags.extend(
+                crate::domain::HELP_PROBLEMS
+                    .iter()
+                    .filter(|tag| crate::domain::problem_kind(tag) == Some(kind))
+                    .map(|tag| (*tag).to_owned()),
+            );
         }
+        self.sync_kinds();
+    }
+    /// Toggles a problem and derives kind eligibility from the selected problems.
+    pub fn toggle_problem(&mut self, tag: &str) {
+        if let Some(index) = self.problem_tags.iter().position(|t| t == tag) {
+            self.problem_tags.remove(index);
+        } else {
+            self.problem_tags.push(tag.to_owned());
+        }
+        self.sync_kinds();
+    }
+    fn sync_kinds(&mut self) {
+        self.kinds = [HelpKind::Technical, HelpKind::Accident]
+            .into_iter()
+            .filter(|kind| {
+                self.problem_tags
+                    .iter()
+                    .any(|tag| crate::domain::problem_kind(tag) == Some(*kind))
+            })
+            .collect();
     }
 }
 
